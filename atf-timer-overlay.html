@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ATF Countdown — Overlay</title>
+
+  <!-- Oxanium font -->
+  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Ably Realtime -->
+  <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+
+  <style>
+    :root {
+      /* ATF championship belt palette (from the shirt) */
+      --gold: #d4af37;
+      --gold-hot: #f0c94c;
+      --gold-deep: #9a7b1e;
+      --black: #101010;
+      --silver: #c8c8c8;
+      --white: #ffffff;
+
+      /* Gap between round label and timer.
+         Tune this one value if you want it tighter/wider. */
+      --round-gap: 138px;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: transparent;
+      font-family: 'Oxanium', system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    }
+
+    /* Row that holds [R1]  [5:00], centered as one unit */
+    #display {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      gap: var(--round-gap);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    /* Round marker — same style as the timer, Impact regular */
+    #round {
+      font-family: Impact, 'Arial Black', 'Haettenschweiler', sans-serif;
+      font-weight: normal;
+      font-size: 140px;
+      line-height: 1;
+      color: #ffffff; /* always white — only the timer changes colour */
+      text-shadow: 2px 2px 2px rgba(0,0,0,0.5);
+      letter-spacing: 6px;
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+    }
+
+    #timer {
+      color: var(--white); /* white when running */
+      font-weight: 900;
+      font-size: 140px;
+      text-shadow: 2px 2px 2px rgba(0,0,0,0.5);
+      letter-spacing: 6px;
+      text-align: center;
+      line-height: 1;
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #timer.done {
+      animation: donePulse 1s ease-in-out 4;
+    }
+    @keyframes donePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
+
+    /* Local control buttons (still work at the desk) */
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(16,16,16,0.8);
+      border: 1px solid var(--gold-deep);
+      padding: 12px;
+      border-radius: 10px;
+      display: flex;
+      gap: 10px;
+      z-index: 9999;
+    }
+
+    button {
+      background: var(--black);
+      color: var(--silver);
+      border: 2px solid var(--gold-deep);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+    button:hover { background: var(--gold); color: var(--black); }
+
+    /* Tiny connection dot, top-left. Gold = remote link live. */
+    #connDot {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #777;
+      opacity: 0.7;
+      z-index: 9999;
+    }
+    #connDot.up { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+    #connDot.down { background: #555; }
+
+    @media (max-width: 800px) {
+      :root { --round-gap: 75px; }
+      #timer { font-size: 80px; letter-spacing: 4px; }
+      #round { font-size: 80px; letter-spacing: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="connDot" title="Remote link status"></div>
+
+  <div id="display">
+    <div id="round">R1</div>
+    <div id="timer">5:00</div>
+  </div>
+
+  <div id="controls">
+    <button onclick="toggleTimer(true)">Pause/Resume</button>
+    <button onclick="resetTimer(startingSeconds, true)">Reset</button>
+  </div>
+
+  <script>
+    // ================================================================
+    //  ATF CONFIG — edit these two lines, save, done.
+    //  ROOM must be identical in the remote file.
+    // ================================================================
+    const ABLY_API_KEY = "tBw4fw.5pecYw:TmTtbrUw1GKiFkDXUSEXkV4dG1i5eBcKZRavv3mmICE";
+    const ROOM = "atf";
+    // ================================================================
+
+    // ---------------- Timer core ----------------
+    let startingSeconds = 5 * 60;   // default 5 minutes (remote can change it)
+    let remaining = startingSeconds;
+    let currentRound = 1;
+    let timerInterval = null;
+    let isRunning = false;
+
+    const el = document.getElementById('timer');
+    const roundEl = document.getElementById('round');
+
+    const colorRunning = '#ffffff';  // white
+    const colorPaused  = '#d20a0a';  // UFC red
+
+    function formatMSS(s) {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${m}:${String(sec).padStart(2,'0')}`;
+    }
+
+    function updateDisplay() {
+      el.textContent = formatMSS(remaining);
+      roundEl.textContent = 'R' + currentRound;
+    }
+
+    function setRound(n, broadcast) {
+      n = Math.max(1, Math.min(5, parseInt(n, 10) || 1));
+      currentRound = n;
+      updateDisplay();
+      if (broadcast) publishState();
+    }
+
+    function startTimer(broadcast) {
+      if (isRunning || remaining <= 0) { publishState(); return; }
+      isRunning = true;
+      el.classList.remove('done');
+      el.style.color = colorRunning;
+      timerInterval = setInterval(() => {
+        if (remaining > 0) {
+          remaining--;
+          updateDisplay();
+          if (remaining === 0) {
+            clearInterval(timerInterval);
+            isRunning = false;
+            el.classList.add('done');
+          }
+          publishState();
+        }
+      }, 1000);
+      if (broadcast) publishState();
+    }
+
+    function pauseTimer(broadcast) {
+      clearInterval(timerInterval);
+      isRunning = false;
+      el.style.color = colorPaused;
+      if (broadcast) publishState();
+    }
+
+    function resetTimer(seconds, broadcast) {
+      clearInterval(timerInterval);
+      isRunning = false;
+      if (typeof seconds === 'number' && seconds > 0) startingSeconds = seconds;
+      remaining = startingSeconds;
+      el.classList.remove('done');
+      updateDisplay();
+      el.style.color = colorPaused;
+      if (broadcast) publishState();
+    }
+
+    function toggleTimer(broadcast) {
+      isRunning ? pauseTimer(broadcast) : startTimer(broadcast);
+    }
+
+    updateDisplay();
+    startTimer(false); // auto-start on load
+
+    // Hotkeys still work at the desk: P pause/resume, R reset, 1-5 round
+    document.addEventListener('keydown', function(e) {
+      const k = e.key.toLowerCase();
+      if (k === 'p') toggleTimer(true);
+      else if (k === 'r') resetTimer(startingSeconds, true);
+      else if (['1','2','3','4','5'].includes(k)) setRound(k, true);
+    });
+
+    // ---------------- Ably remote link ----------------
+    const dot = document.getElementById('connDot');
+    let channel = null;
+
+    function publishState() {
+      if (!channel) return;
+      channel.publish('state', {
+        remaining: remaining,
+        running: isRunning,
+        duration: startingSeconds,
+        round: currentRound
+      });
+    }
+
+    (function connectAbly() {
+      if (!ABLY_API_KEY || ABLY_API_KEY.indexOf('PASTE_') === 0) {
+        console.warn('ATF: No Ably API key set — remote control disabled. Edit ABLY_API_KEY at the top of the script.');
+        dot.className = 'down';
+        return;
+      }
+
+      const ably = new Ably.Realtime({ key: ABLY_API_KEY, clientId: 'atf-overlay' });
+
+      ably.connection.on('connected', () => { dot.className = 'up'; publishState(); });
+      ably.connection.on(['disconnected','suspended','failed','closed'], () => { dot.className = 'down'; });
+
+      channel = ably.channels.get('atf-timer:' + ROOM);
+
+      // Announce presence so the phone remote knows the overlay is live
+      channel.presence.enter({ role: 'overlay' });
+
+      channel.subscribe('cmd', (msg) => {
+        const d = msg.data || {};
+        switch (d.action) {
+          case 'start':  startTimer(true); break;
+          case 'pause':  pauseTimer(true); break;
+          case 'toggle': toggleTimer(true); break;
+          case 'reset':  resetTimer(typeof d.seconds === 'number' ? d.seconds : startingSeconds, true); break;
+          case 'set':    resetTimer(d.seconds, true); break; // set new duration, paused
+          case 'round':  setRound(d.round, true); break;     // R1-R5
+          case 'sync':   publishState(); break;              // remote asking "where are we?"
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
