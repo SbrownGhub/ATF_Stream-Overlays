@@ -3,412 +3,652 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>ATF Timer Remote</title>
+  <title>ATF Round Clock</title>
 
-  <!-- Oxanium font (matches the overlay) -->
-  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Fonts match the Pencil design: Oswald (display) + Inter (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,0" rel="stylesheet">
 
   <!-- Ably Realtime -->
   <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
 
   <style>
     :root {
-      /* ATF championship belt palette (from the shirt) */
-      --gold: #d4af37;
-      --gold-hot: #f0c94c;
-      --gold-deep: #9a7b1e;
-      --bg: #0c0c0c;
-      --panel: #161616;
-      --line: #2c2c2c;
-      --text: #ffffff;
-      --silver: #c8c8c8;
-      --dim: #8a8a8a;
+      --bg:            #0A0A0C;
+      --bg-elevated:   #161511;
+      --surface:       #1E1C17;
+      --surface-line:  #2E2A22;
+      --gold:          #E8A81C;
+      --gold-bright:   #F5C518;
+      --gold-dim:      #8A7332;
+      --white:         #FFFFFF;
+      --text-muted:    #8C867A;
+      --text-dim:      #5A554C;
+      --red:           #E23B3B;
+      --green:         #34C759;
     }
 
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
 
     html, body {
       height: 100%;
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Oxanium', system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      background: #000;
+      color: var(--white);
+      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
-    .wrap {
-      max-width: 460px;
+    .ms {
+      font-family: 'Material Symbols Rounded';
+      font-weight: normal;
+      font-style: normal;
+      line-height: 1;
+      letter-spacing: normal;
+      display: inline-block;
+      -webkit-font-feature-settings: 'liga';
+      font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+      user-select: none;
+    }
+
+    /* ---- Phone frame ---- */
+    .phone {
+      position: relative;
+      width: 100%;
+      max-width: 430px;
+      min-height: 100dvh;
       margin: 0 auto;
-      padding: 20px 16px 32px;
+      background: var(--bg);
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      min-height: 100%;
+    }
+    /* Gold glow (behind timer) — radius kept inside the viewport so it
+       fades to transparent before any screen edge instead of clipping. */
+    .phone::before {
+      content: '';
+      position: absolute;
+      left: -40px; top: 120px;
+      width: 470px; height: 470px;
+      background: radial-gradient(circle 160px at center, rgba(185,130,21,0.38) 0%, rgba(10,10,12,0) 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* Bottom vignette */
+    .phone::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.69) 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .phone > * { position: relative; z-index: 1; }
+
+    /* ---- Status bar (spacing kept; intentionally empty) ---- */
+    .status-bar {
+      height: 62px;
+      flex: none;
+    }
+
+    /* ---- Content ---- */
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+      padding: 8px 22px 20px;
     }
 
     /* ---- Header ---- */
-    .brand {
-      font-weight: 900;
-      font-size: 18px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      text-align: center;
-      color: var(--silver);
+    .header { display: flex; align-items: center; justify-content: space-between; }
+    .tag-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .accent-bar { width: 4px; height: 18px; border-radius: 2px; background: var(--gold); flex: none; }
+    .eyebrow {
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2.5px;
     }
-    .brand span { color: var(--gold); }
-
-    /* ---- Status pills ---- */
-    .status { display: flex; gap: 8px; }
-    .pill {
-      flex: 1;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 8px 12px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      justify-content: center;
-      color: var(--dim);
-    }
-    .pill .led {
+    .conn-led {
       width: 8px; height: 8px; border-radius: 50%;
-      background: var(--dim);
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+      transition: background .3s, box-shadow .3s;
       flex: none;
     }
-    .pill.up { color: var(--text); border-color: var(--gold-deep); }
-    .pill.up .led { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
-    .pill.down .led { background: #d20a0a; box-shadow: 0 0 8px #d20a0a; }
-
-    /* ---- Clock: [R#]  [time] mirrors the overlay ---- */
-    .clock {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 26px 16px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-    .clock::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: var(--gold-deep);
-      transition: background 0.3s;
-    }
-    .clock.running::before { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
-
-    .clockRow {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 28px;
-    }
-    #clockRound {
-      font-family: Impact, 'Arial Black', 'Haettenschweiler', sans-serif;
-      font-weight: bold;
-      font-size: 56px;
-      line-height: 1;
-      color: var(--gold);
-      -webkit-text-stroke: 1px #000;
-      text-shadow: 2px 2px 0 #000;
-      letter-spacing: 1px;
-    }
-    #clockTime {
-      font-size: 64px;
-      font-weight: 900;
-      letter-spacing: 3px;
-      line-height: 1;
-      color: var(--gold);
-      transition: color 0.3s;
-      font-variant-numeric: tabular-nums;
-    }
-    .clock.running #clockTime { color: var(--text); }
-    #clockLabel {
-      margin-top: 10px;
-      font-size: 12px;
+    .conn-led.connected { background: var(--gold-dim); box-shadow: 0 0 8px var(--gold-dim); }
+    .conn-led.live { background: var(--green); box-shadow: 0 0 9px var(--green); }
+    .title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 30px;
       font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--dim);
+      letter-spacing: 0.5px;
+      line-height: 1.05;
     }
+    .menu-btn {
+      width: 42px; height: 42px;
+      background: var(--surface);
+      border: 1px solid var(--surface-line);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      flex: none;
+    }
+    .menu-btn .ms { font-size: 20px; }
+    .menu-btn:active { background: var(--surface-line); }
 
     /* ---- Round selector ---- */
-    .section-label {
+    .rounds-label {
+      color: var(--text-muted);
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--dim);
-      margin: 4px 0 -6px 4px;
+      margin-bottom: 10px;
     }
-    .rounds {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 8px;
-    }
-    .rounds button {
-      font-family: Impact, 'Arial Black', 'Haettenschweiler', sans-serif;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      color: var(--silver);
-      font-size: 22px;
-      padding: 14px 2px;
-      cursor: pointer;
-      letter-spacing: 1px;
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
-    }
-    .rounds button.active {
-      background: var(--gold);
-      border-color: var(--gold-hot);
-      color: #000;
-      box-shadow: 0 0 12px rgba(212,175,55,0.4);
-    }
-    .rounds button:active { background: var(--gold-hot); color: #000; }
-
-    /* ---- Main buttons ---- */
-    .mainBtns {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 10px;
-    }
-    .big {
-      border: none;
+    .pills { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .pill {
+      height: 52px;
+      background: var(--surface);
+      border: 1px solid var(--surface-line);
       border-radius: 14px;
-      font-family: inherit;
-      font-weight: 800;
-      font-size: 22px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      padding: 22px 10px;
+      color: var(--white);
+      font-family: 'Oswald', sans-serif;
+      font-size: 19px;
+      font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
       cursor: pointer;
-      transition: transform 0.05s, background 0.2s;
+      transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
     }
-    .big:active { transform: scale(0.97); }
-    #toggleBtn {
+    .pill.active {
       background: var(--gold);
-      color: #000;
-      box-shadow: 0 0 16px rgba(212,175,55,0.35);
+      border-color: var(--gold);
+      color: #0A0A0C;
+      box-shadow: 0 6px 18px -2px rgba(232,168,28,0.33);
     }
-    #toggleBtn.running {
-      background: #1f1f1f;
+    .pill:active { background: var(--gold-bright); color: #0A0A0C; }
+
+    /* ---- Timer ring ---- */
+    .timer-block { display: flex; justify-content: center; padding-top: 6px; }
+    .ring-wrap { position: relative; width: 266px; height: 266px; }
+    /* overflow:visible lets the ring's drop-shadow glow fade out past the
+       266px viewport instead of being clipped in a rectangle around it. */
+    .ring-wrap svg { position: absolute; inset: 0; width: 266px; height: 266px; overflow: visible; }
+    #ringProgress {
+      transition: stroke-dashoffset .35s linear;
+      filter: drop-shadow(0 0 8px rgba(232,168,28,0.55));
+    }
+    .timer-face {
+      position: absolute;
+      left: 23px; top: 23px;
+      width: 220px; height: 220px;
+      border-radius: 50%;
+      background: var(--bg-elevated);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 2px;
+      text-align: center;
+    }
+    .face-status {
       color: var(--gold);
-      border: 2px solid var(--gold-deep);
-      box-shadow: none;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      transition: color .3s;
+      min-height: 14px;
     }
-    #resetBtn {
-      background: var(--panel);
-      color: var(--silver);
-      border: 2px solid var(--line);
-      font-size: 16px;
+    .face-status.paused { color: var(--red); }
+    .face-status.idle   { color: var(--text-muted); letter-spacing: 2px; }
+    .face-time {
+      font-family: 'Oswald', sans-serif;
+      font-size: 66px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .face-round {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 1px;
     }
 
-    /* ---- Duration presets ---- */
-    .presets {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+    /* ---- Controls ---- */
+    .controls { display: flex; align-items: center; gap: 12px; }
+    .ctl-square {
+      width: 72px; height: 72px;
+      background: var(--surface);
+      border: 1px solid var(--surface-line);
+      border-radius: 20px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      flex: none;
     }
+    .ctl-square:active { background: var(--surface-line); }
+    .ctl-square .ms { font-size: 24px; color: var(--white); }
+    .ctl-square .lbl {
+      color: var(--text-muted);
+      font-size: 9px; font-weight: 600; letter-spacing: 1px;
+    }
+    .toggle-btn {
+      flex: 1;
+      height: 72px;
+      border: none;
+      border-radius: 20px;
+      background: linear-gradient(to bottom, var(--gold-bright) 0%, #E29A12 100%);
+      box-shadow: 0 10px 26px -4px rgba(232,168,28,0.4);
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: transform .05s;
+    }
+    .toggle-btn:active { transform: scale(0.98); }
+    .toggle-btn .ms { font-size: 26px; color: #0A0A0C; font-variation-settings: 'wght' 700; }
+    .toggle-btn .lbl {
+      font-family: 'Oswald', sans-serif;
+      font-size: 20px; font-weight: 600; letter-spacing: 1px;
+      color: #0A0A0C;
+    }
+
+    /* ---- Subscribe bar ---- */
+    .subscribe-bar {
+      height: 60px;
+      background: var(--bg-elevated);
+      border: 1.5px solid var(--gold);
+      border-radius: 18px;
+      box-shadow: 0 0 20px -6px rgba(232,168,28,0.33);
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: transform .05s;
+    }
+    .subscribe-bar:active { transform: scale(0.985); }
+    .subscribe-bar .ms { font-size: 22px; color: var(--gold); font-variation-settings: 'wght' 600; }
+    .subscribe-bar .lbl {
+      font-family: 'Oswald', sans-serif;
+      font-size: 19px; font-weight: 600; letter-spacing: 1.5px;
+      color: var(--gold);
+    }
+    .subscribe-bar .chip {
+      background: var(--gold);
+      border-radius: 8px;
+      padding: 3px 8px;
+      color: #0A0A0C;
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    }
+
+    /* ---- Bottom sheet ---- */
+    .scrim {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+      z-index: 20;
+    }
+    .scrim.open { opacity: 1; pointer-events: auto; }
+    .sheet {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      max-width: 430px;
+      margin: 0 auto;
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--surface-line);
+      border-radius: 22px 22px 0 0;
+      padding: 20px 22px calc(28px + env(safe-area-inset-bottom));
+      transform: translateY(100%);
+      transition: transform .25s cubic-bezier(.2,.8,.2,1);
+      z-index: 21;
+    }
+    .sheet.open { transform: translateY(0); }
+    .sheet-grab { width: 40px; height: 4px; border-radius: 2px; background: var(--surface-line); margin: 0 auto 16px; }
+    .sheet-title { font-family:'Oswald',sans-serif; font-size: 18px; font-weight: 600; letter-spacing: .5px; margin-bottom: 4px; }
+    .sheet-sub { color: var(--text-muted); font-size: 12px; margin-bottom: 16px; }
+    .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
     .presets button {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      color: var(--text);
-      font-family: inherit;
-      font-weight: 700;
-      font-size: 15px;
-      padding: 16px 4px;
+      background: var(--surface);
+      border: 1px solid var(--surface-line);
+      border-radius: 14px;
+      color: var(--white);
+      font-family: 'Oswald', sans-serif;
+      font-size: 18px; font-weight: 600;
+      padding: 18px 4px;
       cursor: pointer;
     }
-    .presets button:active { background: var(--gold); border-color: var(--gold-hot); color: #000; }
-
-    .hint {
-      font-size: 12px;
-      color: var(--dim);
-      text-align: center;
-      line-height: 1.5;
-      margin-top: auto;
-    }
+    .presets button:active { background: var(--gold); border-color: var(--gold); color: #0A0A0C; }
+    .presets button.active { background: var(--gold); border-color: var(--gold); color: #0A0A0C; }
+    .status-lines { border-top: 1px solid var(--surface-line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .status-line { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+    .status-line .k { color: var(--text-muted); }
+    .status-line .v { display: flex; align-items: center; gap: 7px; font-weight: 600; }
+    .status-line .v .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 6px var(--red); }
+    .status-line .v .dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .status-line .v .dot.warn { background: var(--gold-dim); box-shadow: 0 0 6px var(--gold-dim); }
+    .sheet-hint { color: var(--text-dim); font-size: 11px; line-height: 1.5; margin-top: 14px; text-align: center; }
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="phone">
 
-    <div class="brand">ATF <span>Timer Remote</span></div>
+    <!-- Fake phone status bar — spacing kept, intentionally empty -->
+    <div class="status-bar"></div>
 
-    <div class="status">
-      <div class="pill down" id="pillConn"><span class="led"></span><span id="pillConnText">Connecting</span></div>
-      <div class="pill down" id="pillOverlay"><span class="led"></span><span id="pillOverlayText">Overlay offline</span></div>
-    </div>
+    <div class="content">
 
-    <div class="clock" id="clock">
-      <div class="clockRow">
-        <div id="clockRound">R1</div>
-        <div id="clockTime">–:––</div>
+      <!-- Header -->
+      <div class="header">
+        <div>
+          <div class="tag-row">
+            <span class="accent-bar"></span>
+            <span class="eyebrow">BOUT TIMER</span>
+            <span class="conn-led" id="connLed"></span>
+          </div>
+          <div class="title">ROUND CLOCK</div>
+        </div>
+        <div class="menu-btn" id="menuBtn"><span class="ms">tune</span></div>
       </div>
-      <div id="clockLabel">Waiting for overlay</div>
-    </div>
 
-    <div class="section-label">Round</div>
-    <div class="rounds" id="roundBtns">
-      <button data-round="1" class="active" onclick="pickRound(1)">R1</button>
-      <button data-round="2" onclick="pickRound(2)">R2</button>
-      <button data-round="3" onclick="pickRound(3)">R3</button>
-      <button data-round="4" onclick="pickRound(4)">R4</button>
-      <button data-round="5" onclick="pickRound(5)">R5</button>
-    </div>
+      <!-- Round selector -->
+      <div>
+        <div class="rounds-label">ROUNDS</div>
+        <div class="pills" id="pills">
+          <div class="pill active" data-round="1">R1</div>
+          <div class="pill" data-round="2">R2</div>
+          <div class="pill" data-round="3">R3</div>
+          <div class="pill" data-round="4">R4</div>
+          <div class="pill" data-round="5">R5</div>
+        </div>
+      </div>
 
-    <div class="mainBtns">
-      <button class="big" id="toggleBtn" onclick="sendToggle()">Start</button>
-      <button class="big" id="resetBtn" onclick="send({action:'reset'})">Reset</button>
-    </div>
+      <!-- Timer -->
+      <div class="timer-block">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 266 266">
+            <defs>
+              <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%"  stop-color="#F5C518"/>
+                <stop offset="60%" stop-color="#E8A81C"/>
+                <stop offset="100%" stop-color="#8A7332"/>
+              </linearGradient>
+            </defs>
+            <circle cx="133" cy="133" r="126.5" fill="none" stroke="#2E2A22" stroke-width="13"/>
+            <circle id="ringProgress" cx="133" cy="133" r="126.5" fill="none"
+                    stroke="url(#goldGrad)" stroke-width="13" stroke-linecap="round"
+                    transform="rotate(-90 133 133)"
+                    stroke-dasharray="794.82" stroke-dashoffset="0"/>
+          </svg>
+          <div class="timer-face">
+            <div class="face-status idle" id="faceStatus">CONNECTING</div>
+            <div class="face-time" id="faceTime">–:––</div>
+            <div class="face-round" id="faceRound">ROUND 1 OF 5</div>
+          </div>
+        </div>
+      </div>
 
-    <div class="section-label">Set duration (resets timer, paused)</div>
-    <div class="presets">
-      <button onclick="setMinutes(1)">1 min</button>
-      <button onclick="setMinutes(3)">3 min</button>
-      <button onclick="setMinutes(5)">5 min</button>
-    </div>
+      <!-- Controls -->
+      <div class="controls">
+        <div class="ctl-square" id="resetBtn">
+          <span class="ms">restart_alt</span>
+          <span class="lbl">RESET</span>
+        </div>
+        <button class="toggle-btn" id="toggleBtn">
+          <span class="ms" id="toggleIcon">play_arrow</span>
+          <span class="lbl" id="toggleLbl">START</span>
+        </button>
+        <div class="ctl-square" id="nextBtn">
+          <span class="ms">skip_next</span>
+          <span class="lbl">NEXT</span>
+        </div>
+      </div>
 
-    <div class="hint">Clock mirrors the live stream overlay. If it shows –:––, the overlay browser source isn't open in OBS.</div>
+      <!-- Subscribe trigger -->
+      <div class="subscribe-bar" id="subscribeBar">
+        <span class="ms">notifications_active</span>
+        <span class="lbl">SUBSCRIBE</span>
+        <span class="chip">TAP</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Sheet -->
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-grab"></div>
+    <div class="sheet-title">Round Length</div>
+    <div class="sheet-sub">Sets the timer and resets it (paused).</div>
+    <div class="presets" id="presets">
+      <button data-min="1">1 MIN</button>
+      <button data-min="3">3 MIN</button>
+      <button data-min="5">5 MIN</button>
+    </div>
+    <div class="status-lines">
+      <div class="status-line">
+        <span class="k">Connection</span>
+        <span class="v"><span class="dot" id="sheetConnDot"></span><span id="sheetConnText">Connecting</span></span>
+      </div>
+      <div class="status-line">
+        <span class="k">Overlay</span>
+        <span class="v"><span class="dot" id="sheetOvDot"></span><span id="sheetOvText">Offline</span></span>
+      </div>
+    </div>
+    <div class="sheet-hint">Clock mirrors the live stream overlay. If it shows –:––, the overlay browser source isn't open in OBS.</div>
   </div>
 
   <script>
     // ================================================================
-    //  ATF CONFIG — edit these two lines, save, done.
-    //  Must be IDENTICAL to the values in the overlay file.
+    //  ATF CONFIG — must be IDENTICAL to the values in the overlay file.
     // ================================================================
     const ABLY_API_KEY = "T_tSow.CV19vQ:G9npmBXqIVeKSD87d06WDzkdcytatjTDgQEV_dH7fUM";
-    const ROOM = "atf";
+    const ROOM = "ATF_Streamtime";
     // ================================================================
 
-    let channel = null;
-    let lastState = null;
+    const RING_CIRC = 794.82; // 2 * PI * 126.5
 
-    const clockEl = document.getElementById('clock');
-    const timeEl = document.getElementById('clockTime');
-    const roundTextEl = document.getElementById('clockRound');
-    const labelEl = document.getElementById('clockLabel');
-    const toggleBtn = document.getElementById('toggleBtn');
-    const roundBtns = document.querySelectorAll('#roundBtns button');
-    const pillConn = document.getElementById('pillConn');
-    const pillConnText = document.getElementById('pillConnText');
-    const pillOverlay = document.getElementById('pillOverlay');
-    const pillOverlayText = document.getElementById('pillOverlayText');
+    let channel = null;
+    let overlayLive = false;
+    let lastStateAt = 0;
+
+    // Authoritative state from overlay
+    let running = false;
+    let authRemaining = 0;   // remaining seconds at lastAuthAt
+    let lastAuthAt = 0;
+    let currentRound = 1;
+    let currentDuration = 180; // seconds, for the progress ring
+    let hasState = false;
+
+    const el = id => document.getElementById(id);
+    const connLed     = el('connLed');
+    const faceStatus  = el('faceStatus');
+    const faceTime    = el('faceTime');
+    const faceRound   = el('faceRound');
+    const ring        = el('ringProgress');
+    const toggleIcon  = el('toggleIcon');
+    const toggleLbl   = el('toggleLbl');
+    const pills       = document.querySelectorAll('#pills .pill');
+    const sheet       = el('sheet');
+    const scrim       = el('scrim');
 
     function formatMSS(s) {
+      s = Math.max(0, Math.round(s));
       const m = Math.floor(s / 60);
       const sec = s % 60;
-      return `${m}:${String(sec).padStart(2,'0')}`;
+      return m + ':' + String(sec).padStart(2, '0');
     }
 
     // ---------------- Commands ----------------
-    function send(data) {
-      if (!channel) return;
-      channel.publish('cmd', data);
-    }
+    function send(data) { if (channel) channel.publish('cmd', data); }
+
     function sendToggle() {
-      if (lastState) {
-        send({ action: lastState.running ? 'pause' : 'start' });
-      } else {
-        send({ action: 'toggle' });
-      }
+      if (hasState) send({ action: running ? 'pause' : 'start' });
+      else send({ action: 'toggle' });
     }
     function setMinutes(mins) {
-      send({ action: 'set', seconds: Math.round(mins * 60) });
+      const secs = Math.round(mins * 60);
+      currentDuration = secs; // predict ring baseline
+      send({ action: 'set', seconds: secs });
     }
     function pickRound(n) {
+      currentRound = n;
       highlightRound(n); // instant feedback; overlay state confirms
       send({ action: 'round', round: n });
     }
-
-    // ---------------- UI sync ----------------
-    function highlightRound(n) {
-      roundBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.round) === n));
-      roundTextEl.textContent = 'R' + n;
+    function nextRound() {
+      pickRound(Math.min(5, currentRound + 1));
     }
 
-    function applyState(s) {
-      lastState = s;
-      timeEl.textContent = formatMSS(s.remaining);
-      if (typeof s.round === 'number') highlightRound(s.round);
-      if (s.running) {
-        clockEl.classList.add('running');
-        labelEl.textContent = 'Running';
-        toggleBtn.textContent = 'Pause';
-        toggleBtn.classList.add('running');
+    // ---------------- UI ----------------
+    function highlightRound(n) {
+      pills.forEach(p => p.classList.toggle('active', parseInt(p.dataset.round) === n));
+    }
+
+    function displayedRemaining() {
+      if (!running) return authRemaining;
+      const elapsed = (Date.now() - lastAuthAt) / 1000;
+      return Math.max(0, authRemaining - elapsed);
+    }
+
+    function render() {
+      if (!overlayLive) {
+        faceTime.textContent = '–:––';
+        ring.style.strokeDashoffset = RING_CIRC; // empty
+        return;
+      }
+      const rem = displayedRemaining();
+      faceTime.textContent = formatMSS(rem);
+      faceRound.textContent = 'ROUND ' + currentRound + ' OF 5';
+
+      const frac = currentDuration > 0 ? Math.max(0, Math.min(1, rem / currentDuration)) : 0;
+      ring.style.strokeDashoffset = RING_CIRC * (1 - frac);
+
+      faceStatus.classList.remove('paused', 'idle');
+      if (running) {
+        faceStatus.textContent = 'RUNNING';
+        toggleIcon.textContent = 'pause';
+        toggleLbl.textContent = 'PAUSE';
+      } else if (rem <= 0) {
+        faceStatus.textContent = 'TIME!';
+        faceStatus.classList.add('paused');
+        toggleIcon.textContent = 'play_arrow';
+        toggleLbl.textContent = 'START';
       } else {
-        clockEl.classList.remove('running');
-        labelEl.textContent = s.remaining === 0 ? 'Time!' : 'Paused';
-        toggleBtn.textContent = 'Start';
-        toggleBtn.classList.remove('running');
+        faceStatus.textContent = 'PAUSED';
+        faceStatus.classList.add('paused');
+        toggleIcon.textContent = 'play_arrow';
+        toggleLbl.textContent = 'START';
       }
     }
 
+    function applyState(s) {
+      hasState = true;
+      lastAuthAt = Date.now();
+
+      // Detect a reset / set / round-change so the ring baseline tracks it.
+      const prevDisplayed = displayedRemaining();
+      if (typeof s.round === 'number' && s.round !== currentRound) {
+        currentRound = s.round;
+        currentDuration = s.remaining;
+      }
+      if (s.remaining > currentDuration || s.remaining > prevDisplayed + 1.5) {
+        currentDuration = s.remaining; // jumped up => new round length
+      }
+      if (currentDuration <= 0) currentDuration = s.remaining || currentDuration;
+
+      running = !!s.running;
+      authRemaining = s.remaining;
+      if (typeof s.round === 'number') { currentRound = s.round; highlightRound(s.round); }
+      render();
+    }
+
     function setOverlayPresent(present) {
-      pillOverlay.className = 'pill ' + (present ? 'up' : 'down');
-      pillOverlayText.textContent = present ? 'Overlay live' : 'Overlay offline';
+      overlayLive = present;
+      updateConn();
       if (!present) {
-        timeEl.textContent = '–:––';
-        labelEl.textContent = 'Waiting for overlay';
-        toggleBtn.textContent = 'Start';
-        toggleBtn.classList.remove('running');
-        clockEl.classList.remove('running');
-        lastState = null;
+        hasState = false;
+        running = false;
+        faceStatus.textContent = 'WAITING FOR OVERLAY';
+        faceStatus.classList.remove('paused'); faceStatus.classList.add('idle');
+        toggleIcon.textContent = 'play_arrow';
+        toggleLbl.textContent = 'START';
+        render();
       } else {
         send({ action: 'sync' });
       }
     }
 
+    let connState = 'connecting'; // connecting | connected | failed
+    function updateConn() {
+      // Header LED
+      connLed.className = 'conn-led';
+      if (connState === 'connected' && overlayLive) connLed.classList.add('live');
+      else if (connState === 'connected') connLed.classList.add('connected');
+
+      if (connState !== 'connected' && faceStatus.classList.contains('idle')) {
+        faceStatus.textContent = connState === 'failed' ? 'NO CONNECTION' : 'CONNECTING';
+      }
+
+      // Sheet lines
+      const cd = el('sheetConnDot'), ct = el('sheetConnText');
+      const od = el('sheetOvDot'), ot = el('sheetOvText');
+      cd.className = 'dot' + (connState === 'connected' ? ' ok' : (connState === 'connecting' ? ' warn' : ''));
+      ct.textContent = connState === 'connected' ? 'Connected' : (connState === 'connecting' ? 'Connecting' : 'Failed');
+      od.className = 'dot' + (overlayLive ? ' ok' : '');
+      ot.textContent = overlayLive ? 'Live' : 'Offline';
+    }
+
+    // ---------------- Sheet ----------------
+    function openSheet()  { sheet.classList.add('open'); scrim.classList.add('open'); }
+    function closeSheet() { sheet.classList.remove('open'); scrim.classList.remove('open'); }
+
+    el('menuBtn').addEventListener('click', openSheet);
+    el('subscribeBar').addEventListener('click', () => send({ action: 'subscribe' }));
+    scrim.addEventListener('click', closeSheet);
+    el('resetBtn').addEventListener('click', () => send({ action: 'reset' }));
+    el('toggleBtn').addEventListener('click', sendToggle);
+    el('nextBtn').addEventListener('click', nextRound);
+    pills.forEach(p => p.addEventListener('click', () => pickRound(parseInt(p.dataset.round))));
+    document.querySelectorAll('#presets button').forEach(b => {
+      b.addEventListener('click', () => { setMinutes(parseInt(b.dataset.min)); closeSheet(); });
+    });
+
+    // ---------------- Ticking ----------------
+    setInterval(() => { if (overlayLive) render(); }, 250); // smooth local countdown
+
     // ---------------- Connect ----------------
     (function connect() {
       if (!ABLY_API_KEY || ABLY_API_KEY.indexOf('PASTE_') === 0) {
-        pillConnText.textContent = 'No API key in code';
+        connState = 'failed';
+        faceStatus.textContent = 'NO API KEY';
+        updateConn();
         return;
       }
 
       const ably = new Ably.Realtime({ key: ABLY_API_KEY, clientId: 'atf-remote-' + Math.random().toString(36).slice(2, 8) });
 
-      ably.connection.on('connected', () => {
-        pillConn.className = 'pill up';
-        pillConnText.textContent = 'Connected';
-        send({ action: 'sync' });
-      });
-      ably.connection.on(['disconnected','suspended'], () => {
-        pillConn.className = 'pill down';
-        pillConnText.textContent = 'Reconnecting';
-      });
-      ably.connection.on(['failed','closed'], () => {
-        pillConn.className = 'pill down';
-        pillConnText.textContent = 'Connection failed';
-      });
+      ably.connection.on('connected', () => { connState = 'connected'; updateConn(); send({ action: 'sync' }); });
+      ably.connection.on('disconnected', () => { connState = 'connecting'; updateConn(); });
+      ably.connection.on('suspended',    () => { connState = 'connecting'; updateConn(); });
+      ably.connection.on('failed',       () => { connState = 'failed'; updateConn(); });
+      ably.connection.on('closed',       () => { connState = 'failed'; updateConn(); });
 
       channel = ably.channels.get('atf-timer:' + ROOM);
 
-      channel.subscribe('state', (msg) => applyState(msg.data));
+      channel.subscribe('state', (msg) => {
+        lastStateAt = Date.now();
+        if (!overlayLive) setOverlayPresent(true);
+        applyState(msg.data);
+      });
 
-      // Presence: is the overlay open anywhere?
-      channel.presence.subscribe(['enter','present','update'], (m) => {
-        if (m.data && m.data.role === 'overlay') setOverlayPresent(true);
-      });
-      channel.presence.subscribe('leave', (m) => {
-        if (m.data && m.data.role === 'overlay') {
-          channel.presence.get((err, members) => {
-            const stillThere = !err && members && members.some(x => x.data && x.data.role === 'overlay');
-            setOverlayPresent(stillThere);
-          });
-        }
-      });
-      channel.presence.get((err, members) => {
-        const present = !err && members && members.some(x => x.data && x.data.role === 'overlay');
-        setOverlayPresent(present);
-      });
+      // Watchdog: overlay heartbeats every 2s. No word in 6s = it's gone.
+      setInterval(() => {
+        const heard = Date.now() - lastStateAt < 6000;
+        if (heard !== overlayLive) setOverlayPresent(heard);
+        if (!heard) send({ action: 'sync' }); // poke it in case we just woke up
+      }, 2000);
     })();
   </script>
 </body>
