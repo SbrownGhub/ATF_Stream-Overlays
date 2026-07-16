@@ -134,6 +134,11 @@
     }
     #connDot.up { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
     #connDot.down { background: #555; }
+    #connDot.denied { background: #d20a0a; box-shadow: 0 0 6px #d20a0a; animation: dotBlink 1.2s ease-in-out infinite; }
+    @keyframes dotBlink {
+      0%, 100% { opacity: 0.9; }
+      50% { opacity: 0.2; }
+    }
 
     /* Subscribe animation — size & position controlled by the
        --anim-* variables at the top of this stylesheet. */
@@ -331,6 +336,17 @@
       ably.connection.on(['disconnected','suspended','failed','closed'], () => { dot.className = 'down'; });
 
       channel = ably.channels.get('atf-timer:' + ROOM);
+
+      // Surface channel-level auth failures — a key can connect to Ably
+      // but still be denied this specific channel if its capability
+      // resource doesn't match 'atf-timer:atf'.
+      channel.attach((err) => {
+        if (err) {
+          dot.className = 'denied';
+          console.error('ATF: Channel access denied for "atf-timer:' + ROOM + '". ' +
+            'Ably key capability must be  atf-timer:*  with Publish + Subscribe. Error: ' + err.message);
+        }
+      });
 
       // Heartbeat: publish state every 2s so the remote knows we're alive.
       // Uses plain publish — no 'presence' capability needed on the API key.

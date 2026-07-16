@@ -117,9 +117,20 @@
       box-shadow: 0 0 8px var(--red);
       transition: background .3s, box-shadow .3s;
       flex: none;
+      animation: ledBlink 1.2s ease-in-out infinite;
     }
+    /* amber = connected to Ably, waiting on overlay / still connecting */
     .conn-led.connected { background: var(--gold-dim); box-shadow: 0 0 8px var(--gold-dim); }
-    .conn-led.live { background: var(--green); box-shadow: 0 0 9px var(--green); }
+    /* green = overlay live, everything talking. Solid — no blink. */
+    .conn-led.live {
+      background: var(--green);
+      box-shadow: 0 0 9px var(--green);
+      animation: none;
+    }
+    @keyframes ledBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
     .title {
       font-family: 'Oswald', sans-serif;
       font-size: 30px;
@@ -637,9 +648,15 @@
 
       channel = ably.channels.get('atf-timer:' + ROOM);
 
-      // Heartbeat: publish state every 2s so the remote knows we're alive.
-      // Uses plain publish — no 'presence' capability needed on the API key.
-      setInterval(publishState, 2000);
+      // Channel-level auth failure → LED goes red (blinking). Details in console.
+      channel.attach((err) => {
+        if (err) {
+          connState = 'failed';
+          updateConn();
+          console.error('ATF: Channel access denied for "atf-timer:' + ROOM + '". ' +
+            'Ably key capability must be  atf-timer:*  with Publish + Subscribe. Error: ' + err.message);
+        }
+      });
 
       channel.subscribe('state', (msg) => {
         lastStateAt = Date.now();
