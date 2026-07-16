@@ -23,7 +23,7 @@
 
       /* Gap between round label and timer.
          Tune this one value if you want it tighter/wider. */
-      --round-gap: 300px;
+      --round-gap: 138px;
     }
 
     html, body {
@@ -121,10 +121,12 @@
     #connDot.up { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
     #connDot.down { background: #555; }
 
+    /* Narrow-window fallback. Gap scales off --round-gap so there is only
+       ever ONE number to edit. Do not hardcode a gap in here. */
     @media (max-width: 800px) {
-      :root { --round-gap: 300px }
+      #display { gap: calc(var(--round-gap) * 0.55); }
       #timer { font-size: 80px; letter-spacing: 4px; }
-      #round { font-size: 75px; letter-spacing: 4px; }
+      #round { font-size: 80px; letter-spacing: 4px; }
     }
   </style>
 </head>
@@ -147,7 +149,7 @@
     //  ATF CONFIG — edit these two lines, save, done.
     //  ROOM must be identical in the remote file.
     // ================================================================
-    const ABLY_API_KEY = "T_tSow.CV19vQ:G9npmBXqIVeKSD87d06WDzkdcytatjTDgQEV_dH7fUM";
+    const ABLY_API_KEY = "PASTE_YOUR_ABLY_API_KEY_HERE";
     const ROOM = "atf";
     // ================================================================
 
