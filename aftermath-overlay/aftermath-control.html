@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATF Aftermath — Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A0A0A; --panel:#131417; --card:#17191D; --line:#24262B;
+  --amber:#FF9800; --bone:#F2EDE4; --steel:#7A828C;
+  --red:#D71920; --blue:#1E4FD8; --green:#12C46B;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--ink);color:var(--bone);
+  font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding:0 0 40px;}
+
+header{position:sticky;top:0;z-index:10;background:rgba(10,10,10,.97);
+  border-bottom:2px solid var(--amber);padding:13px 20px;
+  display:flex;align-items:center;gap:13px;flex-wrap:wrap;}
+.mark{display:flex;align-items:baseline;gap:10px;}
+.mark .atf{font-family:Anton,'Arial Black',sans-serif;font-size:27px;line-height:1;}
+.mark .sub{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:3.2px;color:var(--amber);}
+.pulse{width:9px;height:9px;border-radius:50%;background:#2A2E35;transition:background .1s;}
+.pulse.on{background:var(--amber);box-shadow:0 0 12px var(--amber);}
+.count{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--steel);}
+header .spacer{flex:1;}
+
+button{font-family:Inter,sans-serif;font-size:13px;font-weight:600;cursor:pointer;
+  background:#1B1D22;color:var(--bone);border:1px solid var(--line);padding:7px 12px;border-radius:2px;}
+button:hover{border-color:var(--amber);}
+button.amber{background:var(--amber);color:var(--ink);border-color:var(--amber);}
+
+main{padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:1400px;}
+.column > h2{margin:0 0 10px;font-family:'IBM Plex Mono',monospace;font-size:12px;
+  letter-spacing:3px;font-weight:500;padding:9px 12px;border:1px solid var(--line);}
+.column.red  > h2{color:#FF8A8F;border-left:4px solid var(--red);}
+.column.blue > h2{color:#8FAAFF;border-left:4px solid var(--blue);}
+
+.level{border:1px solid var(--line);background:var(--panel);margin-bottom:12px;}
+.level > h3{margin:0;padding:8px 12px;border-bottom:1px solid var(--line);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:2.6px;
+  color:var(--amber);display:flex;align-items:center;gap:10px;}
+.level > h3 .spacer{flex:1;}
+.level > h3 button{font-size:10px;padding:4px 8px;letter-spacing:1px;}
+
+.fighter{background:var(--card);padding:11px 12px 13px;display:grid;gap:8px;
+  border-top:1px solid #1C1E23;}
+.fighter:first-of-type{border-top:0;}
+.fighter.off{opacity:.42;}
+.fhead{display:flex;align-items:center;gap:9px;}
+.fhead .layer{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--steel);}
+.fhead .who{font-family:Anton,'Arial Black',sans-serif;font-size:15px;letter-spacing:.5px;}
+.fhead .spacer{flex:1;}
+
+label.field span{display:block;font-family:'IBM Plex Mono',monospace;font-size:9px;
+  letter-spacing:1.6px;color:var(--steel);margin-bottom:3px;}
+input[type=text]{width:100%;background:#0C0D10;border:1px solid var(--line);color:var(--bone);
+  font-family:Inter,sans-serif;font-size:13px;padding:6px 8px;border-radius:2px;}
+input[type=text]:focus{outline:none;border-color:var(--amber);}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+.ctrls{display:flex;align-items:center;gap:7px;}
+.corner{display:flex;gap:0;border:1px solid var(--line);border-radius:2px;overflow:hidden;}
+.corner button{border:0;border-radius:0;padding:5px 11px;font-size:11px;letter-spacing:1.4px;
+  background:#101216;color:var(--steel);}
+.corner button.sel[data-c=red] {background:var(--red); color:#fff;}
+.corner button.sel[data-c=blue]{background:var(--blue);color:#fff;}
+
+.wbtn{width:30px;height:30px;padding:0;border-radius:50%;
+  font-family:Anton,'Arial Black',sans-serif;font-size:14px;
+  color:var(--steel);background:#101216;}
+.wbtn.on{background:var(--green);color:#fff;border-color:var(--green);
+  box-shadow:0 0 12px rgba(18,196,107,.7);}
+
+.ctrls .spacer{flex:1;}
+.toggle{width:48px;height:25px;border-radius:13px;border:1px solid var(--line);
+  background:#1B1D22;position:relative;padding:0;flex:0 0 auto;}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:19px;height:19px;
+  border-radius:50%;background:#4A4F57;transition:.14s;}
+.toggle.on{background:rgba(255,152,0,.22);border-color:var(--amber);}
+.toggle.on::after{left:25px;background:var(--amber);}
+
+footer{padding:0 18px;max-width:1400px;}
+footer .note{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.9;
+  color:var(--steel);border-top:1px solid var(--line);padding-top:14px;}
+footer code{color:var(--amber);}
+textarea{width:100%;height:130px;background:#0C0D10;border:1px solid var(--line);color:var(--bone);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;padding:10px;border-radius:2px;
+  margin-top:10px;display:none;}
+textarea.show{display:block;}
+
+@media (max-width:980px){ main{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mark"><span class="atf">ATF</span><span class="sub">AFTERMATH CONTROL</span></div>
+  <span class="pulse" id="pulse" title="publishes on every change"></span>
+  <span class="count" id="count"></span>
+  <div class="spacer"></div>
+  <button id="allOn">Show all 20</button>
+  <button id="allOff">Hide all</button>
+  <button id="reset">Reset</button>
+  <button id="json">JSON</button>
+</header>
+
+<main id="panel"></main>
+
+<footer>
+  <textarea id="jsonBox" spellcheck="false"></textarea>
+  <p class="note">
+    Left column = red corner fighters, back layer. Right column = blue corner, back layer.<br>
+    Front layer on each side is that fighter's prospective next opponent.<br>
+    Headshots live in <code>./fighters/</code> — filename only, e.g. <code>pantoja.png</code>.
+    Blank name leaves the bar as a clean colour block.
+  </p>
+</footer>
+
+<script src="aftermath-bus.js"></script>
+<script>
+let state = atfLoad();
+const pulse = document.getElementById('pulse');
+
+function push(note){
+  atfPublish(state, note);
+  pulse.classList.add('on');
+  setTimeout(() => pulse.classList.remove('on'), 160);
+  count();
+}
+function count(){
+  let on = 0;
+  state.rows.forEach(r => ATF_SIDES.forEach(s => ATF_LAYERS.forEach(l => { if(r[s][l].visible) on++; })));
+  document.getElementById('count').textContent = on + ' / 20 LIVE';
+}
+function esc(s){ return String(s || '').replace(/"/g,'&quot;'); }
+function get(rid, side, layer){ return state.rows.find(r => r.id === rid)[side][layer]; }
+
+const COLUMNS = [
+  { side:'l', cls:'red',  title:'LEVELS 1–5 · RED CORNER · LEFT' },
+  { side:'r', cls:'blue', title:'LEVELS 1–5 · BLUE CORNER · RIGHT' }
+];
+
+function render(){
+  const panel = document.getElementById('panel');
+  const focus = document.activeElement;
+  const key = focus && focus.dataset && focus.dataset.set
+    ? focus.dataset.r + focus.dataset.s + focus.dataset.l + focus.dataset.set : null;
+  const caret = focus && focus.selectionStart;
+
+  panel.innerHTML = '';
+
+  COLUMNS.forEach(col => {
+    const wrap = document.createElement('div');
+    wrap.className = 'column ' + col.cls;
+    wrap.innerHTML = `<h2>${col.title}</h2>`;
+
+    ATF_ROWS.forEach((row, i) => {
+      const lvl = document.createElement('section');
+      lvl.className = 'level';
+      lvl.innerHTML = `<h3>LEVEL ${i + 1}</h3>`;
+
+      ATF_LAYERS.forEach(layer => {
+        const f = get(row.id, col.side, layer);
+        const card = document.createElement('div');
+        card.className = 'fighter' + (f.visible ? '' : ' off');
+        card.innerHTML = `
+          <div class="fhead">
+            <span class="who">${layer === 'back' ? 'ON THE CARD' : 'NEXT UP'}</span>
+            <span class="layer">${layer === 'back' ? 'BACK LAYER' : 'FRONT LAYER'}</span>
+            <span class="spacer"></span>
+            <button class="toggle ${f.visible ? 'on' : ''}" data-vis
+              data-r="${row.id}" data-s="${col.side}" data-l="${layer}" title="Show / hide"></button>
+          </div>
+
+          <label class="field"><span>NAME</span>
+            <input type="text" data-set="name" data-r="${row.id}" data-s="${col.side}" data-l="${layer}"
+                   value="${esc(f.name)}" placeholder="(blank = colour block)"></label>
+
+          <div class="two">
+            <label class="field"><span>SUBLINE</span>
+              <input type="text" data-set="meta" data-r="${row.id}" data-s="${col.side}" data-l="${layer}"
+                     value="${esc(f.meta)}" placeholder="24-3-0"></label>
+            <label class="field"><span>IMAGE FILE</span>
+              <input type="text" data-set="img" data-r="${row.id}" data-s="${col.side}" data-l="${layer}"
+                     value="${esc(f.img)}" placeholder="lastname.png"></label>
+          </div>
+
+          <div class="ctrls">
+            <div class="corner">
+              <button data-c="red"  class="${f.color === 'red'  ? 'sel' : ''}"
+                data-col data-r="${row.id}" data-s="${col.side}" data-l="${layer}">RED</button>
+              <button data-c="blue" class="${f.color === 'blue' ? 'sel' : ''}"
+                data-col data-r="${row.id}" data-s="${col.side}" data-l="${layer}">BLUE</button>
+            </div>
+            <button class="wbtn ${f.winner ? 'on' : ''}" data-win
+              data-r="${row.id}" data-s="${col.side}" data-l="${layer}" title="Winner flag">W</button>
+            <span class="spacer"></span>
+          </div>`;
+        lvl.appendChild(card);
+      });
+
+      wrap.appendChild(lvl);
+    });
+
+    panel.appendChild(wrap);
+  });
+
+  if(key){
+    const again = [...document.querySelectorAll('input[data-set]')]
+      .find(i => i.dataset.r + i.dataset.s + i.dataset.l + i.dataset.set === key);
+    if(again){ again.focus(); try{ again.setSelectionRange(caret, caret); }catch(e){} }
+  }
+  count();
+}
+
+/* text publishes without re-rendering, so typing is never interrupted */
+document.addEventListener('input', e => {
+  const t = e.target;
+  if(!t.dataset.set) return;
+  get(t.dataset.r, t.dataset.s, t.dataset.l)[t.dataset.set] = t.value;
+  push();
+});
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button');
+  if(!t) return;
+  const ref = () => get(t.dataset.r, t.dataset.s, t.dataset.l);
+  const id  = () => `${t.dataset.r}-${t.dataset.s}-${t.dataset.l}`;
+
+  if(t.dataset.vis !== undefined){ const f = ref(); f.visible = !f.visible; push(); render(); return; }
+  if(t.dataset.col !== undefined){ ref().color = t.dataset.c; push(); render(); return; }
+  if(t.dataset.win !== undefined){ const f = ref(); f.winner = !f.winner; push(); render(); return; }
+
+  const all = fn => state.rows.forEach(r => ATF_SIDES.forEach(s => ATF_LAYERS.forEach(l => fn(r[s][l]))));
+  switch(t.id){
+    case 'allOn':  all(f => f.visible = true);  push({cmd:'replay', target:'all'}); render(); break;
+    case 'allOff': all(f => f.visible = false); push(); render(); break;
+    case 'reset':
+      if(confirm('Clear all 20 fighters back to defaults?')){ state = atfDefaultState(); push(); render(); }
+      break;
+    case 'json': {
+      const box = document.getElementById('jsonBox');
+      box.classList.toggle('show');
+      if(box.classList.contains('show')) box.value = JSON.stringify(state, null, 2);
+      break;
+    }
+  }
+});
+
+document.getElementById('jsonBox').addEventListener('change', e => {
+  try{ state = atfNormalise(JSON.parse(e.target.value)); push(); render(); }
+  catch(err){ alert('That JSON did not parse — nothing changed.'); }
+});
+
+render();
+push();
+</script>
+</body>
+</html>

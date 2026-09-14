@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ATF Aftermath Overlay</title>
+<!--
+  AGAINST THE FENCE — AFTERMATH OVERLAY (OBS BROWSER SOURCE)
+  1920 x 1080, transparent. Driven live by aftermath-control.html.
+  Headshots load from ./fighters/ — filename only, set per fighter.
+  Missing files fall back to the placeholder silhouette.
+  Keys (testing outside OBS): C checkerboard · R replay
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{ --red:#D71920; --blue:#1E4FD8; --amber:#FF9800; --ink:#0A0A0A; --green:#12C46B; }
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;width:100%;height:100%;
+  background:transparent;overflow:hidden;-webkit-font-smoothing:antialiased;}
+#stage{position:absolute;top:0;left:0;width:1920px;height:1080px;
+  transform-origin:top left;background:transparent;overflow:hidden;}
+#checker{position:absolute;inset:0;z-index:0;display:none;
+  background:repeating-conic-gradient(#1c1c1c 0 25%,#2a2a2a 0 50%) 0 0/64px 64px;}
+body.checker #checker{display:block;}
+
+.row{position:absolute;left:0;width:1920px;height:210px;z-index:20;}
+
+/* --dx  = this level's inward step (stage px)
+   --ext = matching bar extension in pod-local px so the bleed survives */
+.pod{position:absolute;top:0;width:360px;height:260px;transform:scale(.8);}
+.pod.l{left:var(--dx);  transform-origin:top left;}
+.pod.r{right:var(--dx); transform-origin:top right;}
+
+.unit{position:absolute;inset:0;}
+.unit.back {z-index:1;}
+.unit.front{z-index:3;}
+.unit.off{display:none;}
+.anim{position:absolute;inset:0;will-change:transform,opacity;}
+
+.shot{position:absolute;color:#181B20;}
+.shot svg,.shot img{width:100%;height:100%;display:block;
+  filter:drop-shadow(0 14px 22px rgba(0,0,0,.65));}
+.shot img{object-fit:contain;object-position:bottom center;}
+.pod.r .shot svg,.pod.r .shot img{transform:scaleX(-1);}
+.shot .png{display:none;}
+.shot.has-img .png{display:block;}
+.shot.has-img .ph{display:none;}
+
+.unit.back  .shot{width:148px;height:176px;top:0;}
+.unit.front .shot{width:166px;height:196px;top:26px;}
+.pod.l .unit.back  .shot{left:164px;}
+.pod.l .unit.front .shot{left:250px;}
+.pod.r .unit.back  .shot{right:164px;}
+.pod.r .unit.front .shot{right:250px;}
+
+.bar{position:absolute;display:flex;align-items:center;gap:14px;overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:2;color:#fff;}
+.unit.back  .bar{top:158px;height:40px;}
+.unit.front .bar{top:208px;height:44px;}
+.pod.l .unit.back  .bar{left:calc(-150px - var(--ext));width:calc(462px + var(--ext));
+  padding-left:calc(170px + var(--ext));}
+.pod.l .unit.front .bar{left:calc(-174px - var(--ext));width:calc(590px + var(--ext));
+  padding-left:calc(194px + var(--ext));}
+.pod.r .unit.back  .bar{right:calc(-150px - var(--ext));width:calc(462px + var(--ext));
+  padding-right:calc(170px + var(--ext));flex-direction:row-reverse;}
+.pod.r .unit.front .bar{right:calc(-174px - var(--ext));width:calc(590px + var(--ext));
+  padding-right:calc(194px + var(--ext));flex-direction:row-reverse;}
+
+.bar .nm{font-family:Anton,'Arial Black',Impact,sans-serif;font-size:31px;line-height:1;
+  letter-spacing:.6px;white-space:nowrap;}
+.bar .mt{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;
+  letter-spacing:2px;opacity:.75;white-space:nowrap;}
+
+/* ---------- winner marker ---------- */
+.win{position:absolute;width:32px;height:32px;border-radius:50%;
+  background:var(--green);z-index:6;display:none;
+  border:2px solid rgba(255,255,255,.28);
+  box-shadow:0 0 16px rgba(18,196,107,.85),0 0 34px rgba(18,196,107,.45),
+             0 3px 10px rgba(0,0,0,.6);}
+.unit.won .win{display:block;}
+.win i{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:Anton,'Arial Black',sans-serif;font-style:normal;
+  font-size:17px;line-height:1;color:#fff;}
+
+/* green rim light around a winning fighter */
+.unit.won .shot svg,.unit.won .shot img{
+  filter:drop-shadow(0 0 2px var(--green))
+         drop-shadow(0 0 6px rgba(18,196,107,.95))
+         drop-shadow(0 0 20px rgba(18,196,107,.55))
+         drop-shadow(0 14px 22px rgba(0,0,0,.65));}
+
+.unit.back  .win{top:162px;}
+.unit.front .win{top:214px;}
+.pod.l .unit.back  .win{left:282px;}
+.pod.l .unit.front .win{left:386px;}
+.pod.r .unit.back  .win{right:282px;}
+.pod.r .unit.front .win{right:386px;}
+
+@keyframes inLeft {0%{opacity:0;transform:translateX(-110px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes inRight{0%{opacity:0;transform:translateX( 110px)}100%{opacity:1;transform:translateX(0)}}
+.pod.l .anim.run{animation:inLeft  .74s cubic-bezier(.16,.86,.3,1) both;}
+.pod.r .anim.run{animation:inRight .74s cubic-bezier(.16,.86,.3,1) both;}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;}}
+</style>
+</head>
+<body>
+<div id="stage"><div id="checker"></div><div id="rows"></div></div>
+
+<script src="aftermath-bus.js"></script>
+<script>
+const PLACEHOLDER = `<svg class="ph" viewBox="0 0 160 190" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+  <path fill="currentColor" d="M80 8c-19 0-31 14-31 34 0 15 5 27 12 34l-2 14c-24 7-41 20-47 38 -3 9-4 20-4 30v32h144v-32c0-10-1-21-4-30 -6-18-23-31-47-38l-2-14c7-7 12-19 12-34 0-20-12-34-31-34z"/>
+</svg>`;
+
+/* ---------- build once ---------- */
+const rowsEl = document.getElementById('rows');
+ATF_ROWS.forEach(r => {
+  const ext = Math.round(r.dx / 0.8) + 40;
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.style.top = r.y + 'px';
+  row.innerHTML = ATF_SIDES.map(side => `
+    <div class="pod ${side}" style="--dx:${r.dx}px;--ext:${ext}px">
+      ${ATF_LAYERS.map(layer => `
+        <div class="unit ${layer}" id="${r.id}-${side}-${layer}">
+          <div class="anim">
+            <div class="shot">${PLACEHOLDER}<img class="png" alt=""></div>
+            <div class="bar"><span class="nm"></span><span class="mt"></span></div>
+            <div class="win"><i>W</i></div>
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+  rowsEl.appendChild(row);
+});
+
+document.querySelectorAll('.shot .png').forEach(img => {
+  img.addEventListener('error', () => img.closest('.shot').classList.remove('has-img'));
+  img.addEventListener('load',  () => img.closest('.shot').classList.add('has-img'));
+});
+
+function play(id){
+  const el = document.getElementById(id);
+  if(!el || el.classList.contains('off')) return;
+  const a = el.querySelector('.anim');
+  a.classList.remove('run'); void a.offsetWidth; a.classList.add('run');
+}
+
+/* ---------- apply state ---------- */
+const prevVisible = {};
+function apply(state, note){
+  state.rows.forEach(row => {
+    ATF_SIDES.forEach(side => ATF_LAYERS.forEach(layer => {
+      const f  = row[side][layer];
+      const id = `${row.id}-${side}-${layer}`;
+      const el = document.getElementById(id);
+      if(!el) return;
+
+      el.classList.toggle('off', !f.visible);
+      el.classList.toggle('won', !!f.winner);
+
+      const shot = el.querySelector('.shot');
+      const img  = el.querySelector('.png');
+      const want = f.img ? ('fighters/' + f.img) : '';
+      if(want){
+        if(img.getAttribute('src') !== want) img.setAttribute('src', want);
+      }else{
+        img.removeAttribute('src');
+        shot.classList.remove('has-img');
+      }
+
+      el.querySelector('.bar').style.background = ATF_BAR[f.color] || ATF_BAR.red;
+      el.querySelector('.nm').textContent = f.name || '';
+      el.querySelector('.mt').textContent = f.meta || '';
+
+      if(f.visible && prevVisible[id] === false) play(id);
+      prevVisible[id] = f.visible;
+    }));
+  });
+
+  if(note && note.cmd === 'replay'){
+    if(note.target === 'all') replayAll();
+    else play(note.target);
+  }
+}
+
+const IDS = atfUnitIds();
+function replayAll(){ IDS.forEach((id,i) => setTimeout(() => play(id), i * 55)); }
+
+apply(atfLoad(), null);
+replayAll();
+atfSubscribe(apply);
+
+/* ---------- preview helpers (harmless in OBS) ---------- */
+const stage = document.getElementById('stage');
+function fit(){
+  const k = Math.min(innerWidth/1920, innerHeight/1080);
+  stage.style.transform = `scale(${k})`;
+  stage.style.left = ((innerWidth  - 1920*k)/2) + 'px';
+  stage.style.top  = ((innerHeight - 1080*k)/2) + 'px';
+}
+addEventListener('resize', fit); fit();
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if(k === 'c') document.body.classList.toggle('checker');
+  if(k === 'r') replayAll();
+});
+</script>
+</body>
+</html>
