@@ -48,27 +48,39 @@ There is no manual replay button — visibility is the trigger.
 
 ## Running it
 
-The controller drives the overlay through `localStorage`, which only
-syncs between pages on the **same origin**.
+- **OBS / Streamlabs → Browser source**, 1920 × 1080:
+  `https://sbrownghub.github.io/ATF_Stream-Overlays/aftermath-overlay/aftermath-overlay.html`
+- **Controller** — open anywhere: phone, tablet, another PC, or a browser dock:
+  `https://sbrownghub.github.io/ATF_Stream-Overlays/aftermath-overlay/aftermath-control.html`
+
+Every change travels two ways at once:
+
+| Link | Reaches | Needs |
+|---|---|---|
+| `localStorage` + `BroadcastChannel` | pages in the same browser, same origin | nothing |
+| Ably channel `atf-aftermath:atf` | any device | Ably key with capability `atf-aftermath:*`, Publish + Subscribe |
+
+The controller header shows the Ably link: **REMOTE LIVE** is good,
+**REMOTE DENIED** means the key's capability is missing `atf-aftermath:*`.
+The key and room are set once in `aftermath-bus.js` (`ATF_ABLY_KEY`,
+`ATF_ABLY_ROOM`), so every page always matches.
+
+Newest change wins. A controller opening on a new device does not publish
+on load — it asks the channel for the live card first, so it cannot wipe
+it. The overlay caches the last card, so refreshing the browser source
+keeps it.
+
+For local testing:
 
 ```bash
 cd aftermath-overlay
 python3 -m http.server 8080
 ```
 
-- **OBS → Sources → Browser**: `http://localhost:8080/aftermath-overlay.html`, 1920 × 1080
-- **OBS → Docks → Custom Browser Docks**: `http://localhost:8080/aftermath-control.html`
-
-Run the controller as an OBS dock, not in desktop Chrome. OBS's browser is
-a separate process — a controller outside OBS cannot reach the overlay
-inside it. Both URLs must match exactly; `localhost` and `127.0.0.1` count
-as different origins and the link will silently fail.
-
-Deploying to GitHub Pages works the same way: point both the source and
-the dock at the Pages URL. All paths are relative, so the folder works
-from any subdirectory.
-
-`file://` is fine for eyeballing the layout but will not sync.
+then use `http://localhost:8080/aftermath-overlay.html` and
+`http://localhost:8080/aftermath-control.html`. All paths are relative, so
+the folder works from any subdirectory. `file://` is fine for eyeballing
+the layout but will not sync.
 
 ## Headshots
 

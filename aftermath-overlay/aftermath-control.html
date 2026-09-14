@@ -26,6 +26,8 @@ header{position:sticky;top:0;z-index:10;background:rgba(10,10,10,.97);
 .pulse{width:9px;height:9px;border-radius:50%;background:#2A2E35;transition:background .1s;}
 .pulse.on{background:var(--amber);box-shadow:0 0 12px var(--amber);}
 .count{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--steel);}
+.link.live{color:var(--amber);}
+.link.denied,.link.offline{color:#FF8A8F;}
 header .spacer{flex:1;}
 
 button{font-family:Inter,sans-serif;font-size:13px;font-weight:600;cursor:pointer;
@@ -101,6 +103,7 @@ textarea.show{display:block;}
   <div class="mark"><span class="atf">ATF</span><span class="sub">AFTERMATH CONTROL</span></div>
   <span class="pulse" id="pulse" title="publishes on every change"></span>
   <span class="count" id="count"></span>
+  <span class="count link" id="link" title="cross-device link (Ably)"></span>
   <div class="spacer"></div>
   <button id="allOn">Show all 20</button>
   <button id="allOff">Hide all</button>
@@ -120,6 +123,7 @@ textarea.show{display:block;}
   </p>
 </footer>
 
+<script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
 <script src="aftermath-bus.js"></script>
 <script>
 let state = atfLoad();
@@ -256,8 +260,16 @@ document.getElementById('jsonBox').addEventListener('change', e => {
   catch(err){ alert('That JSON did not parse — nothing changed.'); }
 });
 
+/* No publish on load: a controller opening on a new device must not
+   overwrite the live card. It takes the newest card from the channel. */
+atfSubscribe(s => { state = s; render(); });
+atfOnLink(st => {
+  const el = document.getElementById('link');
+  el.textContent = { off:'REMOTE OFF', connecting:'REMOTE …', live:'REMOTE LIVE',
+                     offline:'REMOTE OFFLINE', denied:'REMOTE DENIED' }[st];
+  el.className = 'count link ' + st;
+});
 render();
-push();
 </script>
 </body>
 </html>

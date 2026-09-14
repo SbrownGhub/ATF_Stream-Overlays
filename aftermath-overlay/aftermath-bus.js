@@ -9,11 +9,25 @@
      Front layer, either side = that fighter's prospective next opponent.
      20 fighters total.
 
-   Transport: localStorage (source of truth) + BroadcastChannel (instant)
-              + a 300ms poll (fallback where events don't fire).
+   Transport:
+     same device  localStorage (source of truth) + BroadcastChannel (instant)
+                  + a 300ms poll (fallback where events don't fire).
+     any device   Ably channel  atf-aftermath:<ROOM>  — controller on a phone,
+                  tablet or other PC, overlay in OBS / Streamlabs.
+                  The key's capability must allow  atf-aftermath:*
+                  with Publish + Subscribe.
+
+   Every state carries a rev. A page only accepts a rev newer than the
+   newest it has seen, so duplicate or late deliveries are ignored, and
+   every publish is stamped newer than anything seen (clock-skew safe).
    ===================================================================== */
 
 const ATF_KEY = 'atf_aftermath_overlay_state_v1';
+
+/* Ably remote link. ROOM lives here so every device always matches. */
+const ATF_ABLY_KEY     = "tBw4fw.Du7a8g:Nw87ANLIEFE0uSU86Rt4-c2QWLPOMopApUBOwLJrC5E";
+const ATF_ABLY_ROOM    = "atf";
+const ATF_ABLY_CHANNEL = 'atf-aftermath:' + ATF_ABLY_ROOM;
 
 /* Approved geometry. dx is how far a level steps inward — the arc.
    Deliberately not exposed in the controller. */
@@ -75,43 +89,138 @@ function atfNormalise(raw){
   return base;
 }
 
+let _atfRev   = 0;      /* newest rev this page has seen or sent */
+let _atfState = null;   /* newest state, used to answer sync requests */
+const _atfListeners = [];
+
+function _atfStore(state){
+  try{ localStorage.setItem(ATF_KEY, JSON.stringify(state)); }catch(e){}
+}
+
 function atfLoad(){
+  let s = atfDefaultState();
   try{
     const raw = localStorage.getItem(ATF_KEY);
-    if(raw) return atfNormalise(JSON.parse(raw));
+    if(raw) s = atfNormalise(JSON.parse(raw));
   }catch(e){ /* storage blocked or corrupt */ }
-  return atfDefaultState();
+  if(s.rev > _atfRev) _atfRev = s.rev;
+  _atfState = s;
+  return s;
 }
 
 let _atfChannel = null;
 try{ _atfChannel = new BroadcastChannel('atf-aftermath-overlay'); }catch(e){ _atfChannel = null; }
 
 function atfPublish(state, note){
-  state.rev  = Date.now();
-  state.note = note || null;        /* e.g. {cmd:'replay', target:'R1-l-back'} */
-  try{ localStorage.setItem(ATF_KEY, JSON.stringify(state)); }catch(e){}
+  state.rev  = Math.max(Date.now(), _atfRev + 1);
+  state.note = note || null;        /* e.g. {cmd:'replay', target:'all'} */
+  _atfRev = state.rev;
+  _atfState = state;
+  _atfStore(state);
   if(_atfChannel){ try{ _atfChannel.postMessage(state); }catch(e){} }
+  _atfAblyConnect();
+  _atfAblySend('state', state);
   return state;
 }
 
+function _atfDeliver(s, fromRemote){
+  if(!s || !(s.rev > _atfRev)) return;
+  _atfRev = s.rev;
+  const clean = atfNormalise(s);
+  _atfState = clean;
+  if(fromRemote) _atfStore(s);      /* cache so a refresh keeps the card */
+  _atfListeners.forEach(cb => cb(clean, s.note || null));
+}
+
 function atfSubscribe(cb){
-  let lastRev = -1;
-  const deliver = s => {
-    if(!s || s.rev === lastRev) return;
-    lastRev = s.rev;
-    cb(atfNormalise(s), s.note || null);
-  };
-  if(_atfChannel) _atfChannel.onmessage = e => deliver(e.data);
-  addEventListener('storage', e => {
-    if(e.key !== ATF_KEY || !e.newValue) return;
-    try{ deliver(JSON.parse(e.newValue)); }catch(err){}
+  _atfListeners.push(cb);
+  _atfAblyConnect();
+}
+
+if(_atfChannel) _atfChannel.onmessage = e => _atfDeliver(e.data, false);
+addEventListener('storage', e => {
+  if(e.key !== ATF_KEY || !e.newValue) return;
+  try{ _atfDeliver(JSON.parse(e.newValue), false); }catch(err){}
+});
+setInterval(() => {
+  try{
+    const raw = localStorage.getItem(ATF_KEY);
+    if(raw) _atfDeliver(JSON.parse(raw), false);
+  }catch(e){}
+}, 300);
+
+/* ---------- Ably: cross-device link ----------
+   Link states: off · connecting · live · offline · denied */
+let _atfAblyCh = null;
+let _atfAblyTried = false;
+let _atfLinkState = 'off';
+const _atfLinkCbs = [];
+
+function _atfSetLink(st){
+  if(st === _atfLinkState) return;
+  _atfLinkState = st;
+  _atfLinkCbs.forEach(cb => cb(st));
+}
+
+function atfOnLink(cb){
+  _atfLinkCbs.push(cb);
+  cb(_atfLinkState);
+}
+
+function _atfAblySend(name, data){
+  if(!_atfAblyCh || _atfLinkState === 'denied') return;
+  _atfAblyCh.publish(name, data, err => {
+    if(err) console.warn('ATF: Ably publish failed — ' + err.message);
   });
-  setInterval(() => {
-    try{
-      const raw = localStorage.getItem(ATF_KEY);
-      if(raw) deliver(JSON.parse(raw));
-    }catch(e){}
-  }, 300);
+}
+
+/* Ask the channel for its newest card. Anyone holding a newer one answers;
+   anyone holding an older one asks back, so the newest card always wins. */
+function _atfAblySync(){
+  _atfAblySend('sync', { rev: _atfRev });
+}
+
+function _atfAblyConnect(){
+  if(_atfAblyTried) return;         /* one attempt per page — no retry spam without a key */
+  _atfAblyTried = true;
+  if(typeof Ably === 'undefined'){
+    console.warn('ATF: Ably library did not load — cross-device control disabled, same-device sync still works.');
+    return;
+  }
+  if(!ATF_ABLY_KEY || ATF_ABLY_KEY.indexOf('PASTE_') === 0){
+    console.warn('ATF: No Ably API key set — cross-device control disabled. Edit ATF_ABLY_KEY in aftermath-bus.js.');
+    return;
+  }
+
+  _atfSetLink('connecting');
+  const ably = new Ably.Realtime({
+    key: ATF_ABLY_KEY,
+    clientId: 'atf-aftermath-' + Math.random().toString(36).slice(2, 8),
+    echoMessages: false
+  });
+  const ch = _atfAblyCh = ably.channels.get(ATF_ABLY_CHANNEL);
+
+  ably.connection.on(['connecting', 'disconnected'], () => { if(_atfLinkState !== 'denied') _atfSetLink('connecting'); });
+  ably.connection.on(['suspended', 'failed', 'closed'], s => {
+    if(_atfLinkState !== 'denied') _atfSetLink('offline');
+    if(s && s.reason) console.error('ATF: Ably connection ' + s.current + ' — ' + s.reason.message);
+  });
+  ably.connection.on('connected', () => { if(ch.state === 'attached') _atfAblySync(); });
+
+  ch.on('attached', () => { _atfSetLink('live'); _atfAblySync(); });
+
+  ch.subscribe('state', msg => _atfDeliver(msg.data, true), err => {
+    if(!err) return;
+    _atfSetLink(err.code === 40160 || err.statusCode === 401 ? 'denied' : 'offline');
+    console.error('ATF: Channel access denied for "' + ATF_ABLY_CHANNEL + '". ' +
+      'Ably key capability must include  atf-aftermath:*  with Publish + Subscribe. Error: ' + err.message);
+  });
+
+  ch.subscribe('sync', msg => {
+    const theirs = (msg.data && msg.data.rev) || 0;
+    if(_atfRev > theirs && _atfState) _atfAblySend('state', Object.assign({}, _atfState, { note: null }));
+    else if(_atfRev < theirs) _atfAblySync();
+  });
 }
 
 /* every unit id, in paint order */

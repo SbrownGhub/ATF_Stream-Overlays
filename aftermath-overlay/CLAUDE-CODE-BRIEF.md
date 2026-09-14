@@ -67,6 +67,10 @@ not depending on a terminal window staying open during a show.
 
 ## The failure mode to watch for
 
+> **Update:** an Ably link (`atf-aftermath:*`) was added later so the
+> controller can run on any device. The notes below still describe the
+> same-device `localStorage` path; see README.md → Running it.
+
 The controller reaches the overlay through `localStorage`, which only
 syncs between pages on the **same origin**. OBS runs its browser in a
 separate process from desktop Chrome, so:
