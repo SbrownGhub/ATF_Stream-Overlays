@@ -1,0 +1,52 @@
+# ATF Breakdowns — keep the Supabase project awake
+#
+# Free Supabase projects pause after about a week without database activity.
+# This queries the poll once a day through the public state endpoint, which
+# reads the database — so it needs no secrets.
+#
+# Supabase emails a warning about a week before it would pause a project.
+# If that email ever arrives, this isn't enough activity: add a second
+# cron line below.
+#
+# INSTALL
+#   1. Copy this file to .github/workflows/ at the ROOT of ATF_Stream-Overlays
+#      (workflows only run from there, not from inside a subfolder).
+#   2. Repo → Settings → Secrets and variables → Actions → Variables tab →
+#      New repository variable:  ATF_POLL_URL = https://<project>.vercel.app
+#   3. Actions tab → this workflow → "Run workflow" once to confirm it's green.
+#
+# If a run fails, GitHub emails you. That's your early warning that the
+# poll is down — better on a Tuesday than on fight night.
+#
+# NOTE: GitHub disables scheduled workflows in public repos after 60 days
+# with no commits. It emails you first, and one click re-enables it. If the
+# repo goes quiet for two months, check this is still running.
+
+name: ATF Breakdowns keepalive
+
+on:
+  schedule:
+    - cron: '17 6 * * *'       # 06:17 UTC daily
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Query the poll state
+        env:
+          URL: ${{ vars.ATF_POLL_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "Set the ATF_POLL_URL repository variable first."; exit 1
+          fi
+          code=$(curl -s -o r.json -w '%{http_code}' --max-time 30 \
+            "$URL/api/state?keepalive=${{ github.run_id }}")
+          cat r.json; echo
+          if [ "$code" != "200" ]; then
+            echo "State endpoint returned $code — the database may be paused."
+            echo "Restore it: Supabase dashboard → project → Restore."
+            exit 1
+          fi
+          echo "Database awake."

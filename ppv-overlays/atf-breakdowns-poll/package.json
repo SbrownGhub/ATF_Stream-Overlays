@@ -1,0 +1,9 @@
+{
+  "name": "atf-breakdowns-poll",
+  "private": true,
+  "type": "module",
+  "description": "ATF Breakdowns fan poll — overlay, public voter page, presenter controller",
+  "dependencies": {
+    "ably": "^2.4.0"
+  }
+}

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0A">
+<title>ATF — Breakdown Pool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="/atf-live.js"></script>
+<style>
+:root{ --red:#E11B26; --red-deep:#8E0F16; --blue:#2A5BF0; --blue-deep:#12309B;
+  --amber:#FF9800; --bone:#F2EDE4; --steel:#7A828C; --line:#24262B; --green:#12C46B; }
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;background:#0A0A0A;color:var(--bone);font-family:Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;}
+#app{max-width:460px;margin:0 auto;min-height:100vh;
+  padding:calc(24px + env(safe-area-inset-top)) 18px calc(100px + env(safe-area-inset-bottom));}
+.brand{display:flex;align-items:baseline;gap:9px;}
+.brand .a{font-family:Anton,sans-serif;font-size:28px;}
+.brand .b{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--amber);}
+
+.join h1{font-family:Anton,sans-serif;font-size:46px;line-height:.95;margin:40px 0 14px;}
+.join p{font-size:15px;line-height:1.5;color:#B9BEC6;margin:0 0 10px;}
+.rules{margin:22px 0 28px;padding:14px 16px;border:1px solid var(--line);background:#111317;
+  font-size:13px;line-height:1.6;color:#AEB4BC;}
+.rules b{color:var(--bone);font-weight:600;}
+.affirm{width:100%;padding:19px;border:0;border-radius:3px;cursor:pointer;background:var(--amber);
+  color:#0A0A0A;font-family:Anton,sans-serif;font-size:24px;letter-spacing:1px;
+  box-shadow:0 10px 26px rgba(255,152,0,.3);}
+.affirm:active{transform:scale(.98);}
+.affirm:disabled{opacity:.6;}
+.fine{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1.4px;color:#5E656E;
+  text-align:center;margin-top:12px;}
+
+.wait{text-align:center;padding-top:120px;}
+.wait .dot{width:14px;height:14px;border-radius:50%;background:var(--amber);margin:0 auto 22px;
+  animation:pls 1.6s ease-in-out infinite;}
+@keyframes pls{0%,100%{box-shadow:0 0 0 0 rgba(255,152,0,.55)}50%{box-shadow:0 0 0 14px rgba(255,152,0,0)}}
+.wait h2{font-family:Anton,sans-serif;font-size:34px;margin:0 0 10px;}
+.wait p{color:#9AA1AA;font-size:14px;line-height:1.5;margin:0;}
+
+.rhead{display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px;}
+.rhead .rn{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2.6px;color:var(--steel);}
+.pill{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;padding:5px 9px;border-radius:20px;}
+.pill.open{background:rgba(18,196,107,.14);color:var(--green);border:1px solid rgba(18,196,107,.4);}
+.pill.frozen{background:rgba(255,152,0,.12);color:var(--amber);border:1px solid rgba(255,152,0,.4);}
+.vs{display:flex;gap:6px;margin-bottom:16px;}
+.vs div{flex:1;padding:11px 12px;font-family:Anton,sans-serif;font-size:19px;color:#fff;}
+.vs .r{background:linear-gradient(95deg,var(--red),var(--red-deep));clip-path:polygon(0 0,100% 0,calc(100% - 10px) 100%,0 100%);}
+.vs .b{background:linear-gradient(265deg,var(--blue),var(--blue-deep));text-align:right;clip-path:polygon(10px 0,100% 0,100% 100%,0 100%);}
+
+.q{background:#131519;border:1px solid var(--line);border-radius:4px;padding:12px;margin-bottom:10px;}
+.q .top{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.q .ic{width:38px;height:38px;border-radius:50%;background:#F0EDE7;display:flex;align-items:center;justify-content:center;}
+.q .ic img{width:28px;height:28px;}
+.q .lb{font-family:Anton,sans-serif;font-size:19px;letter-spacing:1.4px;flex:1;}
+.q .ok{width:18px;height:18px;border-radius:50%;background:var(--green);display:none;}
+.q.done .ok{display:block;}
+.q .bt{display:flex;gap:8px;}
+.q .bt button{flex:1;padding:14px 8px;border-radius:3px;cursor:pointer;border:2px solid;background:transparent;
+  font-family:Anton,sans-serif;font-size:17px;letter-spacing:.8px;transition:all .15s;}
+.q .bt .r{border-color:rgba(225,27,38,.55);color:#FF6B72;}
+.q .bt .b{border-color:rgba(42,91,240,.55);color:#7E9DFF;}
+.q .bt .r.sel{background:var(--red);border-color:var(--red);color:#fff;animation:tapin .3s both;}
+.q .bt .b.sel{background:var(--blue);border-color:var(--blue);color:#fff;animation:tapin .3s both;}
+.q.done .bt button:not(.sel){opacity:.4;}
+@keyframes tapin{0%{transform:scale(.94)}60%{transform:scale(1.04)}100%{transform:scale(1)}}
+.q .bt .res{display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px;margin-top:3px;}
+.locked .q .bt button{cursor:default;}
+
+.foot{position:fixed;left:0;right:0;bottom:0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,rgba(10,10,10,0),#0A0A0A 34%);}
+.foot .wrap{max-width:424px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;}
+.foot .p{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2px;color:#9AA1AA;}
+.foot .dots{display:flex;gap:5px;}
+.foot .dots i{width:9px;height:9px;border-radius:50%;background:#2A2E35;}
+.foot .dots i.on{background:var(--amber);}
+.toast{position:fixed;left:50%;top:calc(18px + env(safe-area-inset-top));transform:translateX(-50%);
+  background:#1B1D22;border:1px solid var(--line);padding:9px 14px;border-radius:20px;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1.4px;opacity:0;transition:opacity .2s;}
+.toast.on{opacity:1;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<script>
+/* ---------- device identity: random, local, no personal data ---------- */
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+};
+let device = store.get('atf_device');
+if(!device){ device = uuid(); store.set('atf_device', device); }
+let joined = store.get('atf_joined') === '1';
+
+let S = null;                     // latest server snapshot
+let mine = [null,null,null,null,null];
+let minePoll = '';
+
+function loadMine(pollId){
+  if(pollId === minePoll) return;
+  minePoll = pollId;
+  try{ mine = JSON.parse(store.get('atf_mine_' + pollId)) || [null,null,null,null,null]; }
+  catch(e){ mine = [null,null,null,null,null]; }
+}
+const saveMine = () => store.set('atf_mine_' + minePoll, JSON.stringify(mine));
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+const app = document.getElementById('app');
+function render(){
+  if(!joined){
+    app.innerHTML = `<div class="join">
+      <div class="brand"><span class="a">ATF</span><span class="b">AGAINST THE FENCE</span></div>
+      <h1>JOIN THE<br>BREAKDOWN<br>POOL</h1>
+      <p>Five abilities. You call who has the edge — red corner or blue — and your vote goes on screen live.</p>
+      <div class="rules"><b>How it works</b><br>
+        Pick red or blue for every ability.<br>
+        You can change a pick until voting is frozen.<br>
+        One vote per device, per ability.</div>
+      <button class="affirm" id="affirm">I'M IN THE POOL</button>
+      <div class="fine">NO SIGN-UP · NO PERSONAL DATA</div></div>`;
+    document.getElementById('affirm').onclick = join;
+    return;
+  }
+  if(!S || S.status === 'idle'){
+    app.innerHTML = `<div class="wait"><div class="dot"></div><h2>YOU'RE IN</h2>
+      <p>${S && S.live ? 'Waiting for the presenters<br>to open voting.'
+                       : 'The show isn\'t live yet.<br>This page wakes up when it is.'}</p></div>`;
+    return;
+  }
+  const frozen = S.status === 'frozen';
+  const done = mine.filter(Boolean).length;
+  app.innerHTML = `<div class="${frozen ? 'locked' : ''}">
+    <div class="brand"><span class="a">ATF</span><span class="b">BREAKDOWN POOL</span></div>
+    <div class="rhead"><span class="rn">WHO HAS THE EDGE?</span>
+      <span class="pill ${frozen ? 'frozen' : 'open'}">${frozen ? 'VOTING CLOSED' : '● VOTING OPEN'}</span></div>
+    <div class="vs"><div class="r">RED CORNER</div><div class="b">BLUE CORNER</div></div>
+    ${ATF.ABILITIES.map((a, i) => {
+      const m = mine[i], sp = frozen ? ATF.split(S.tally[i]) : null;
+      return `<div class="q ${m ? 'done' : ''}">
+        <div class="top"><div class="ic"><img src="/icons/${a.k}.png" alt=""></div>
+          <span class="lb">${a.l}</span><span class="ok"></span></div>
+        <div class="bt">
+          <button class="r ${m === 'r' ? 'sel' : ''}" data-i="${i}" data-c="r">RED${sp ? `<span class="res">${sp[0]}% OF FANS</span>` : ''}</button>
+          <button class="b ${m === 'b' ? 'sel' : ''}" data-i="${i}" data-c="b">BLUE${sp ? `<span class="res">${sp[1]}% OF FANS</span>` : ''}</button>
+        </div></div>`;
+    }).join('')}</div>
+    <div class="foot"><div class="wrap">
+      <span class="p">${frozen ? 'RESULTS ON STREAM' : done + ' OF 5 PICKED'}</span>
+      <div class="dots">${mine.map(m => `<i class="${m ? 'on' : ''}"></i>`).join('')}</div></div></div>`;
+  if(!frozen) app.querySelectorAll('.bt button').forEach(b => b.onclick = () => vote(+b.dataset.i, b.dataset.c));
+}
+
+async function join(){
+  const btn = document.getElementById('affirm'); btn.disabled = true;
+  try{
+    const r = await fetch('/api/join', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ device }) });
+    if(!r.ok) throw 0;
+    joined = true; store.set('atf_joined', '1'); render();
+  }catch(e){ btn.disabled = false; toast('COULD NOT JOIN — TRY AGAIN'); }
+}
+
+async function vote(i, c){
+  if(!S || S.status !== 'open' || mine[i] === c) return;
+  const before = mine[i];
+  mine[i] = c; saveMine(); render();              // optimistic
+  try{
+    const r = await fetch('/api/vote', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ device, i, pick:c }) });
+    if(r.status === 409){ mine[i] = before; saveMine(); toast('VOTING IS CLOSED'); render(); return; }
+    if(!r.ok) throw 0;
+  }catch(e){ mine[i] = before; saveMine(); toast('VOTE NOT SENT — TAP AGAIN'); render(); }
+}
+
+/* Voters only poll the cached endpoint — never a realtime connection.
+     every 3s   while the presenter controller is connected, or voting is open
+     every 30s  otherwise — a quiet check so the page notices you come on air
+     never      while the tab is backgrounded or the phone is locked
+   A phone can't be told the presenter connected without a live connection
+   to every phone, which is what this design avoids. The 30s check is the
+   price of that. */
+ATFLive(s => { S = s; loadMine(s.pollId); render(); }, {
+  realtime:false,
+  pauseHidden:true,
+  poll: s => (!s || s.live || s.status === 'open') ? 3000 : 30000
+});
+render();
+</script>
+</body>
+</html>

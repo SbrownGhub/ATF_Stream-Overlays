@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ATF Breakdowns — Overlay</title>
+<!--
+  STREAMLABS BROWSER SOURCE — width 608, height 766.
+  Transparent. Driven live by /presenter. Add ?checker to preview the alpha.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+<script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+<script src="/atf-live.js"></script>
+<style>
+:root{ --red:#E11B26; --red-deep:#8E0F16; --blue:#2A5BF0; --blue-deep:#12309B; --ink:#0E1116; }
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;
+  -webkit-font-smoothing:antialiased;}
+body.checker{background:repeating-conic-gradient(#15171a 0 25%,#1d2024 0 50%) 0 0/32px 32px;}
+
+#stage{position:absolute;top:0;left:0;width:1200px;height:1511px;transform-origin:top left;
+  padding:26px;display:flex;flex-direction:column;gap:22px;}
+.corners{flex:0 0 auto;display:flex;gap:14px;height:92px;}
+.cnr{flex:1;display:flex;align-items:center;padding:0 32px;font-family:Anton,'Arial Black',sans-serif;
+  font-size:44px;line-height:1;letter-spacing:3px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.28);
+  box-shadow:0 14px 32px rgba(0,0,0,.45);}
+.cnr.r{background:linear-gradient(95deg,var(--red),var(--red-deep));
+  clip-path:polygon(0 0,100% 0,calc(100% - 26px) 100%,0 100%);}
+.cnr.b{background:linear-gradient(265deg,var(--blue),var(--blue-deep));
+  clip-path:polygon(26px 0,100% 0,100% 100%,0 100%);justify-content:flex-end;}
+
+.rows{flex:1;display:flex;flex-direction:column;gap:22px;}
+.rw{flex:1 1 0;position:relative;display:flex;align-items:center;gap:12px;padding:0 22px;
+  overflow:hidden;background:#fff;border-radius:5px;
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 24px),calc(100% - 24px) 100%,0 100%);
+  box-shadow:0 22px 46px rgba(0,0,0,.5),0 4px 12px rgba(0,0,0,.3);}
+.wash{position:absolute;inset:0;opacity:0;pointer-events:none;}
+.rw.red  .wash{opacity:1;background:linear-gradient(90deg,rgba(225,27,38,.2),transparent 70%);}
+.rw.blue .wash{opacity:1;background:linear-gradient(270deg,rgba(42,91,240,.2),transparent 70%);}
+.spine{position:absolute;top:0;bottom:0;width:11px;opacity:0;}
+.spine.l{left:0;background:var(--red);} .spine.r{right:0;background:var(--blue);}
+.rw.red .spine.l,.rw.blue .spine.r{opacity:1;}
+.mid{flex:1;display:flex;flex-direction:column;align-items:center;gap:9px;z-index:2;min-width:0;}
+.icon{width:140px;height:140px;border-radius:50%;background:#F0EDE7;display:flex;align-items:center;
+  justify-content:center;box-shadow:inset 0 2px 5px rgba(14,17,22,.1),0 2px 0 #fff;}
+.icon img{width:106px;height:106px;filter:drop-shadow(0 3px 5px rgba(14,17,22,.22));}
+.label{font-family:Anton,'Arial Black',sans-serif;font-size:46px;line-height:1;letter-spacing:3.4px;color:var(--ink);}
+
+.pct{width:140px;flex:0 0 auto;text-align:center;z-index:2;font-family:Anton,'Arial Black',sans-serif;
+  font-size:62px;line-height:1;letter-spacing:-.5px;}
+.pct small{font-size:32px;margin-left:2px;}
+.pct.r{color:var(--red);} .pct.b{color:var(--blue);}
+.pct.none{color:#CFCAC1;}
+.pct:not(.lead):not(.none){opacity:.55;}
+
+.tick{width:124px;height:124px;flex:0 0 auto;position:relative;display:flex;align-items:center;
+  justify-content:center;z-index:2;}
+.tick .disc{position:absolute;inset:8px;border-radius:50%;border:4px dashed rgba(14,17,22,.3);background:#EBE7E0;}
+.tick .mk{position:relative;width:52px;height:52px;opacity:.26;}
+.tick .mk svg{width:100%;height:100%;display:block;}
+.tick .ring{position:absolute;inset:5px;border-radius:50%;border:4px solid;opacity:0;}
+.tick.on .disc{inset:3px;border:0;}
+.tick.on .mk{opacity:1;}
+.tick.red.on  .disc{background:radial-gradient(circle at 34% 26%,#FF3B45,var(--red-deep));
+  box-shadow:0 0 0 4px rgba(255,255,255,.6) inset,0 10px 22px rgba(142,15,22,.45);}
+.tick.blue.on .disc{background:radial-gradient(circle at 34% 26%,#5480FF,var(--blue-deep));
+  box-shadow:0 0 0 4px rgba(255,255,255,.6) inset,0 10px 22px rgba(18,48,155,.45);}
+.tick .on-mk{display:none;} .tick.on .on-mk{display:block;} .tick.on .off-mk{display:none;}
+.strobe{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:3;}
+.rw.red .strobe{background:var(--red);} .rw.blue .strobe{background:var(--blue);}
+
+@keyframes stamp{0%{transform:scale(.35) rotate(-22deg);opacity:0}55%{transform:scale(1.22) rotate(5deg);opacity:1}
+  78%{transform:scale(.95)}100%{transform:scale(1)}}
+@keyframes ringOut{0%{transform:scale(.8);opacity:.9}100%{transform:scale(2.3);opacity:0}}
+@keyframes hit{0%{transform:scale(1)}32%{transform:scale(1.07)}100%{transform:scale(1)}}
+@keyframes lift{0%{transform:translateY(0)}34%{transform:translateY(-7px)}100%{transform:translateY(0)}}
+@keyframes tint{0%{opacity:0}18%{opacity:.32}100%{opacity:0}}
+@keyframes spin{0%{transform:rotate(0)}40%{transform:rotate(-9deg) scale(1.12)}100%{transform:rotate(0)}}
+.tick.fx.on .disc,.tick.fx.on .mk{animation:stamp .52s cubic-bezier(.2,.9,.3,1.25) both;}
+.tick.fx.on .ring{animation:ringOut .62s ease-out both;}
+.tick.red.fx.on .ring{border-color:rgba(225,27,38,.85);}
+.tick.blue.fx.on .ring{border-color:rgba(42,91,240,.85);}
+.rw.fx{animation:lift .5s cubic-bezier(.2,.9,.3,1.2) both;}
+.rw.fx .mid{animation:hit .5s both;}
+.rw.fx .icon img{animation:spin .55s both;}
+.rw.fx .strobe{animation:tint .45s ease both;}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="corners"><div class="cnr r">RED CORNER</div><div class="cnr b">BLUE CORNER</div></div>
+  <div class="rows" id="rows"></div>
+</div>
+<script>
+const CW = `<svg viewBox="0 0 30 30" fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16l6.5 6.5L25 7"/></svg>`;
+const CK = `<svg viewBox="0 0 30 30" fill="none" stroke="#0E1116" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16l6.5 6.5L25 7"/></svg>`;
+const rows = document.getElementById('rows');
+rows.innerHTML = ATF.ABILITIES.map(a => `
+  <div class="rw">
+    <div class="wash"></div><div class="spine l"></div><div class="spine r"></div>
+    <div class="tick red"><div class="disc"></div><div class="ring"></div>
+      <div class="mk on-mk">${CW}</div><div class="mk off-mk">${CK}</div></div>
+    <div class="pct r none"><span class="n">—</span></div>
+    <div class="mid"><div class="icon"><img src="/icons/${a.k}.png" alt=""></div><div class="label">${a.l}</div></div>
+    <div class="pct b none"><span class="n">—</span></div>
+    <div class="tick blue"><div class="disc"></div><div class="ring"></div>
+      <div class="mk on-mk">${CW}</div><div class="mk off-mk">${CK}</div></div>
+    <div class="strobe"></div>
+  </div>`).join('');
+
+function setCall(i, corner, fx){
+  const rw = rows.children[i];
+  const tr = rw.querySelector('.tick.red'), tb = rw.querySelector('.tick.blue');
+  rw.classList.remove('red','blue','fx'); tr.classList.remove('on','fx'); tb.classList.remove('on','fx');
+  void rw.offsetWidth;
+  if(!corner) return;
+  rw.classList.add(corner); (corner === 'red' ? tr : tb).classList.add('on');
+  if(fx){
+    [rw, tr, tb].forEach(e => e.classList.add('fx'));
+    setTimeout(() => [rw, tr, tb].forEach(e => e.classList.remove('fx')), 700);
+  }
+}
+
+function setPct(el, val){
+  const n = el.querySelector('.n');
+  if(val === null){ el.classList.add('none'); el.classList.remove('lead'); n.innerHTML = '—'; el._v = null; return; }
+  el.classList.remove('none');
+  if(el._v === val) return;
+  const from = el._v ?? 0; el._v = val;
+  const t0 = performance.now();
+  cancelAnimationFrame(el._raf);
+  const step = now => {
+    const p = Math.min(1, (now - t0) / 380), e = 1 - Math.pow(1 - p, 3);
+    n.innerHTML = Math.round(from + (val - from) * e) + '<small>%</small>';
+    if(p < 1) el._raf = requestAnimationFrame(step);
+  };
+  el._raf = requestAnimationFrame(step);
+}
+
+let prev = null;
+ATFLive(s => {
+  s.tally.forEach((v, i) => {
+    const rw = rows.children[i], sp = ATF.split(v);
+    const pr = rw.querySelector('.pct.r'), pb = rw.querySelector('.pct.b');
+    setPct(pr, sp ? sp[0] : null); setPct(pb, sp ? sp[1] : null);
+    pr.classList.toggle('lead', !!sp && sp[0] >= sp[1]);
+    pb.classList.toggle('lead', !!sp && sp[1] >= sp[0]);
+  });
+  /* animate only calls that changed since the last snapshot — the very
+     first load paints silently so a reload mid-show doesn't replay five stamps */
+  s.panel.forEach((p, i) => {
+    if(prev === null){ setCall(i, p, false); return; }
+    if(prev[i] !== p){ setCall(i, p, !!p); ATFSound.call(p); }
+  });
+  prev = s.panel.slice();
+}, { realtime:true, poll:2500 });
+
+/* fit: designed at 1200 x 1511, never larger than 676 x 851 */
+const stage = document.getElementById('stage');
+function fit(){
+  const k = Math.min(0.5628, innerWidth / 1200, innerHeight / 1511);
+  stage.style.transform = `scale(${k})`;
+  stage.style.left = Math.max(0, (innerWidth - 1200 * k) / 2) + 'px';
+  stage.style.top  = Math.max(0, (innerHeight - 1511 * k) / 2) + 'px';
+}
+addEventListener('resize', fit); fit();
+if(new URLSearchParams(location.search).has('checker')) document.body.classList.add('checker');
+if(new URLSearchParams(location.search).has('mute')) ATFSound.mute(true);
+</script>
+</body>
+</html>
