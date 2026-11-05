@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0A0A0A">
+<meta name="apple-mobile-web-app-title" content="ATF Aftermath">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/brand/favicon-64.png">
+<title>ATF Aftermath — Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="/shared.js"></script>
+<style>
+/* Everything is sized in rem, and the rem is set by script so the whole
+   controller fills an iPad exactly in landscape — any model, with or
+   without Safari's toolbar. Designed at 118 x 73 rem. */
+:root{ --ink:#0A0A0A; --panel:#131417; --card:#17191D; --line:#26282D; --amber:#FF9800;
+  --bone:#F2EDE4; --steel:#7A828C; --red:#D71920; --blue:#1E4FD8; --green:#12C46B; }
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{font-size:10px;}
+html,body{margin:0;background:var(--ink);color:var(--bone);font-family:Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;}
+button{font-family:inherit;cursor:pointer;}
+
+#app.ui{display:flex;flex-direction:column;
+  padding:calc(.8rem + env(safe-area-inset-top)) calc(.8rem + env(safe-area-inset-right))
+          calc(.8rem + env(safe-area-inset-bottom)) calc(.8rem + env(safe-area-inset-left));}
+html.land #app.ui{height:var(--appH);overflow:hidden;}
+
+header{flex:0 0 5rem;display:flex;align-items:center;gap:1rem;margin-bottom:.8rem;
+  padding:0 .4rem;border-bottom:.2rem solid var(--red);}
+.mark{display:flex;align-items:baseline;gap:.8rem;}
+.mark{align-items:center;}
+.mark .logo{height:3.6rem;width:auto;display:block;}
+.mark .b{font-family:'IBM Plex Mono',monospace;font-size:1rem;letter-spacing:.3rem;color:var(--red);}
+.conn{width:.9rem;height:.9rem;border-radius:50%;background:#3A3F47;}
+.conn.on{background:var(--green);box-shadow:0 0 1rem var(--green);}
+.conn.off{background:var(--red);}
+.mono{font-family:'IBM Plex Mono',monospace;font-size:1.05rem;letter-spacing:.15rem;color:var(--steel);}
+.mono.warn{color:var(--red);}
+header .sp{flex:1;}
+header button{height:3.6rem;padding:0 1.6rem;border-radius:.3rem;border:1px solid var(--line);background:#1A1C21;
+  color:var(--bone);font-weight:700;font-size:1.2rem;letter-spacing:.03rem;position:relative;overflow:hidden;
+  user-select:none;-webkit-user-select:none;}
+header button.go{background:var(--green);border-color:var(--green);color:#04120A;}
+.rs .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(215,25,32,.6);}
+.rs.holding .fill{width:100%;transition:width .9s linear;}
+.rs span{position:relative;}
+
+main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;}
+.col{display:flex;flex-direction:column;gap:.6rem;min-height:0;}
+.col h2{flex:0 0 2.6rem;margin:0;display:flex;align-items:center;padding:0 1rem;
+  font-family:'IBM Plex Mono',monospace;font-size:1.1rem;font-weight:500;letter-spacing:.3rem;
+  border:1px solid var(--line);}
+.col.l h2{color:#FF8A8F;border-left:.4rem solid var(--red);}
+.col.r h2{color:#93A9FF;border-left:.4rem solid var(--blue);}
+.levels{flex:1;min-height:0;display:flex;flex-direction:column;gap:.6rem;}
+
+/* a level: numbered tab + the two fighters side by side */
+.level{flex:1 1 0;min-height:0;display:grid;grid-template-columns:3rem 1fr 1fr;gap:1px;
+  background:var(--line);border:1px solid var(--line);}
+.tab{background:#101216;display:flex;align-items:center;justify-content:center;
+  font-family:Anton,sans-serif;font-size:2.2rem;color:var(--amber);}
+
+/* a fighter card: thumbnail full height on the left, two rows of controls */
+.f{background:var(--card);padding:.7rem;display:grid;grid-template-columns:8.6rem 1fr;gap:.8rem;min-width:0;min-height:0;}
+.f.off{opacity:.42;}
+.thw{position:relative;min-height:0;}
+.th{position:absolute;inset:0;border-radius:.3rem;overflow:hidden;
+  background:repeating-conic-gradient(#1c1f24 0 25%,#262a30 0 50%) 0 0/1rem 1rem;
+  display:flex;align-items:flex-end;justify-content:center;}
+.th img{max-width:100%;max-height:100%;display:block;}
+.th.missing{background:#1F1416;border:1px dashed rgba(255,138,143,.5);align-items:center;}
+.th.missing span{font-family:'IBM Plex Mono',monospace;font-size:.95rem;letter-spacing:.02rem;color:#FF8A8F;
+  text-align:center;line-height:1.35;padding:0 .3rem;}
+.slot{position:absolute;left:.4rem;top:.4rem;z-index:2;font-family:Anton,sans-serif;font-size:1.5rem;line-height:1;
+  padding:.3rem .55rem;border-radius:.3rem;background:rgba(10,10,10,.82);color:var(--bone);}
+
+.ctl{display:flex;flex-direction:column;justify-content:center;gap:.5rem;min-width:0;}
+.role{font-family:'IBM Plex Mono',monospace;font-size:.95rem;letter-spacing:.16rem;color:var(--steel);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.r1,.r2{display:flex;align-items:center;gap:.6rem;min-width:0;}
+.r1 input{flex:1;min-width:0;height:4.2rem;background:#0C0D10;border:1px solid var(--line);color:var(--bone);
+  font-family:Anton,'Arial Narrow','Helvetica Neue Condensed',sans-serif;font-stretch:condensed;
+  font-size:1.7rem;letter-spacing:.04rem;text-transform:uppercase;padding:0 .7rem;border-radius:.3rem;}
+.r1 input:focus{outline:none;border-color:var(--amber);}
+.r1 input::placeholder{font-family:Inter,sans-serif;font-size:1.2rem;letter-spacing:0;text-transform:none;color:#555B64;}
+.w{flex:0 0 3.8rem;width:3.8rem;height:3.8rem;border-radius:50%;border:1px solid var(--line);background:#101216;
+  color:var(--steel);font-family:Anton,sans-serif;font-size:1.6rem;padding:0;}
+.w.on{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 0 1.4rem rgba(18,196,107,.8);}
+.seg{display:flex;border:1px solid var(--line);border-radius:.3rem;overflow:hidden;}
+.seg button{border:0;height:3.6rem;padding:0 .95rem;font-size:1.15rem;font-weight:700;letter-spacing:.1rem;
+  background:#101216;color:var(--steel);}
+.seg button.sel[data-c=red]{background:var(--red);color:#fff;}
+.seg button.sel[data-c=blue]{background:var(--blue);color:#fff;}
+.r2 .sp{flex:1;}
+.tg{flex:0 0 4.6rem;width:4.6rem;height:2.7rem;border-radius:1.4rem;border:1px solid var(--line);background:#1B1D22;
+  position:relative;padding:0;}
+.tg::after{content:'';position:absolute;top:.2rem;left:.2rem;width:2.1rem;height:2.1rem;border-radius:50%;
+  background:#4A4F57;transition:.14s;}
+.tg.on{background:rgba(255,152,0,.2);border-color:var(--amber);}
+.tg.on::after{left:2.1rem;background:var(--amber);}
+
+/* portrait or a small window: one column, scrolls */
+html:not(.land) main{grid-template-columns:1fr;}
+html:not(.land) .level{flex:0 0 12rem;}
+
+/* PIN gate keeps fixed pixel sizes */
+.gate{max-width:420px;margin:0 auto;padding:calc(90px + env(safe-area-inset-top)) 22px;}
+.gate h1{font-family:Anton,sans-serif;font-size:36px;margin:24px 0 8px;}
+.gate p{color:#9AA1AA;font-size:14px;line-height:1.5;margin:0 0 18px;}
+.gate input{width:100%;padding:14px;background:#0C0D10;border:1px solid var(--line);color:var(--bone);
+  font-size:20px;letter-spacing:6px;text-align:center;border-radius:3px;margin-bottom:10px;}
+.gate button{width:100%;padding:15px;border:0;border-radius:3px;background:var(--amber);color:#0A0A0A;
+  font-family:Anton,sans-serif;font-size:20px;letter-spacing:1px;}
+.gate .mark{display:flex;align-items:center;gap:10px;} .gate .mark .b{font-size:10px;letter-spacing:3px;}
+.err{color:#FF6B72;font-family:'IBM Plex Mono',monospace;font-size:11px;min-height:16px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const app = document.getElementById('app');
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+let pin = store.get('atf_aftermath_pin') || '';
+let S = null, built = false, live = null;
+
+/* ---------- send changes ---------- */
+async function send(ops){
+  try{
+    const r = await fetch('/api/update', { method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-atf-pin': pin }, body: JSON.stringify({ ops }) });
+    if(r.status === 401){ store.del('atf_aftermath_pin'); pin = ''; gate('That PIN was rejected.'); return; }
+    if(!r.ok) throw 0;
+  }catch(e){ setConn(false); }
+}
+const set = (slot, patch) => { Object.assign(S.fighters[slot], patch); paint(); send([{ slot, set: patch }]); };
+
+/* ---------- PIN gate (only if the server has one) ---------- */
+function gate(msg){
+  built = false;
+  app.className = '';
+  app.innerHTML = `<div class="gate">
+    <div class="mark"><img src="/brand/atf-logo.png" alt="ATF" style="height:40px;width:auto;display:block"><span class="b">AFTERMATH</span></div>
+    <h1>ENTER PIN</h1><p>This controller is PIN-protected. It's remembered on this iPad.</p>
+    <input id="k" type="password" inputmode="numeric" autocomplete="off">
+    <div class="err">${msg || ''}</div><button id="go">UNLOCK</button></div>`;
+  const go = () => { const v = document.getElementById('k').value.trim(); if(!v) return;
+    pin = v; store.set('atf_aftermath_pin', v); start(); };
+  document.getElementById('go').onclick = go;
+  document.getElementById('k').onkeydown = e => { if(e.key === 'Enter') go(); };
+}
+
+/* ---------- build ---------- */
+const ROLE = { back:'ON THE CARD', front:'NEXT UP' };
+function card(slot){
+  const m = ATF.meta(slot);
+  return `<div class="f" data-slot="${slot}">
+    <div class="thw"><span class="slot">${m.label}</span><div class="th"></div></div>
+    <div class="ctl">
+      <div class="role">${ROLE[m.layer]}</div>
+      <div class="r1"><input data-act="name" maxlength="40" placeholder="Fighter name" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button class="w" data-act="win" aria-label="Winner">W</button></div>
+      <div class="r2"><div class="seg">
+          <button data-act="color" data-c="red">RED</button><button data-act="color" data-c="blue">BLUE</button></div>
+        <span class="sp"></span><button class="tg" data-act="vis" aria-label="Show or hide"></button></div>
+    </div>
+  </div>`;
+}
+function build(){
+  const col = side => {
+    let h = `<div class="col ${side}"><h2>${side === 'l' ? 'RED CORNER · A' : 'BLUE CORNER · B'}</h2><div class="levels">`;
+    for(let lv = 1; lv <= 5; lv++){
+      const n = side === 'l' ? 2 * lv - 1 : 2 * lv;
+      h += `<section class="level"><div class="tab">${lv}</div>${card(String(n))}${card(n + '.1')}</section>`;
+    }
+    return h + '</div></div>';
+  };
+  app.className = 'ui';
+  app.innerHTML = `<header>
+      <div class="mark"><img class="logo" src="/brand/atf-logo.png" alt="ATF"><span class="b">AFTERMATH</span></div>
+      <span class="conn" id="conn"></span><span class="mono" id="imgs"></span>
+      <span class="sp"></span>
+      <button class="go" id="showAll">SHOW ALL</button>
+      <button id="hideAll">HIDE ALL</button>
+      <button class="rs" id="reset"><i class="fill"></i><span>HOLD TO RESET</span></button>
+    </header><main>${col('l')}${col('r')}</main>`;
+
+  app.querySelector('main').addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]'); if(!b || !S) return;
+    const slot = b.closest('.f').dataset.slot, f = S.fighters[slot];
+    if(b.dataset.act === 'vis')   set(slot, { visible: !f.visible });
+    if(b.dataset.act === 'color') set(slot, { color: b.dataset.c });
+    if(b.dataset.act === 'win')   set(slot, { winner: !f.winner });
+  });
+  const timers = {};
+  app.querySelector('main').addEventListener('input', e => {
+    if(e.target.dataset.act !== 'name') return;
+    const slot = e.target.closest('.f').dataset.slot;
+    fitName(e.target);
+    S.fighters[slot].name = e.target.value;
+    clearTimeout(timers[slot]);
+    timers[slot] = setTimeout(() => send([{ slot, set:{ name: e.target.value } }]), 200);
+  });
+  document.getElementById('showAll').onclick = () => {
+    ATF.SLOTS.forEach(s => S.fighters[s].visible = true); paint(); send([{ all:'show' }]); };
+  document.getElementById('hideAll').onclick = () => {
+    ATF.SLOTS.forEach(s => S.fighters[s].visible = false); paint(); send([{ all:'hide' }]); };
+
+  /* hold 0.9s to reset names, colours and winners — a stray tap can't */
+  const rs = document.getElementById('reset'); let hold = null;
+  rs.addEventListener('pointerdown', e => { e.preventDefault(); rs.classList.add('holding');
+    hold = setTimeout(() => { rs.classList.remove('holding'); send([{ all:'reset' }]); }, 900); });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => rs.addEventListener(ev, () => {
+    rs.classList.remove('holding'); clearTimeout(hold); }));
+  built = true;
+}
+
+/* ---------- names shrink to fit their field, like the overlay banners ---------- */
+function fitName(input){
+  const base = 1.7, min = 1.05;                   // rem
+  let size = base;
+  input.style.fontSize = size + 'rem';
+  while(input.scrollWidth > input.clientWidth + 1 && size > min){ size -= .05; input.style.fontSize = size + 'rem'; }
+}
+const fitAllNames = () => document.querySelectorAll('.f input').forEach(fitName);
+/* Fonts load lazily — Anton arrives after the first names are drawn — so
+   re-fit whenever a font finishes loading, not just once at startup. */
+if(document.fonts){
+  document.fonts.ready.then(fitAllNames);
+  document.fonts.addEventListener('loadingdone', fitAllNames);
+}
+
+/* ---------- paint state into the cards ---------- */
+function paint(){
+  if(!S || !built) return;
+  let have = 0;
+  ATF.SLOTS.forEach(slot => {
+    const el = app.querySelector(`.f[data-slot="${slot}"]`), f = S.fighters[slot], ver = S.images[slot];
+    if(!el || !f) return;
+    el.classList.toggle('off', !f.visible);
+    el.querySelector('.tg').classList.toggle('on', f.visible);
+    el.querySelectorAll('.seg button').forEach(b => b.classList.toggle('sel', b.dataset.c === f.color));
+    el.querySelector('.w').classList.toggle('on', f.winner);
+    const input = el.querySelector('input');
+    if(document.activeElement !== input && input.value !== f.name){ input.value = f.name; fitName(input); }   // never fight your typing
+    const th = el.querySelector('.th');
+    if(ver) have++;
+    if(th.dataset.ver !== String(ver)){
+      th.dataset.ver = String(ver);
+      th.className = 'th' + (ver ? '' : ' missing');
+      th.innerHTML = ver ? `<img src="/fighters/${slot}?v=${ver}" alt="">`
+                         : `<span>ADD<br>Fighter ${ATF.meta(slot).label}.png</span>`;
+    }
+  });
+  const imgs = document.getElementById('imgs');
+  imgs.textContent = `${have}/20 IMAGES`;
+  imgs.classList.toggle('warn', have < 20);
+}
+function setConn(v){ const c = document.getElementById('conn'); if(c) c.className = 'conn ' + (v ? 'on' : 'off'); }
+
+async function start(){
+  build();
+  if(!live) live = ATF.connect(s => { S = s; paint(); }, setConn);
+  else { try{ S = await (await fetch('/api/state')).json(); paint(); }catch(e){} }
+}
+
+/* ---------- fit the whole controller to the iPad in landscape ----------
+   Re-fits on rotation or a genuine width change only. The on-screen
+   keyboard shrinks the height; re-fitting then would shrink everything
+   every time you typed a name, so height-only changes are ignored. */
+const probe = document.createElement('div');
+probe.style.cssText = 'position:fixed;top:0;left:0;height:0;visibility:hidden;' +
+  'padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)';
+document.body.appendChild(probe);
+let fittedW = 0;
+function fitUI(force){
+  const w = innerWidth, h = innerHeight;
+  if(!force && w === fittedW) return;
+  fittedW = w;
+  const land = w >= h && w >= 900;
+  const root = document.documentElement;
+  root.classList.toggle('land', land);
+  const cs = getComputedStyle(probe);
+  const safe = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+  const rem = land ? Math.min(w / 118, (h - safe) / 73) : Math.min(w / 62, 12);
+  root.style.fontSize = rem + 'px';
+  root.style.setProperty('--appH', h + 'px');
+  requestAnimationFrame(fitAllNames);
+}
+addEventListener('resize', () => fitUI(false));
+addEventListener('orientationchange', () => setTimeout(() => fitUI(true), 250));
+fitUI(true);
+
+(async () => {
+  let cfg = { pinRequired:false };
+  try{ cfg = await (await fetch('/api/config')).json(); }catch(e){}
+  if(cfg.pinRequired && !pin) gate(); else start();
+})();
+</script>
+</body>
+</html>

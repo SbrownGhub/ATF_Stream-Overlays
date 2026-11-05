@@ -1,0 +1,8 @@
+{
+  "name": "atf-aftermath-local",
+  "private": true,
+  "type": "module",
+  "description": "ATF Aftermath overlay — local server, iPad controller. No dependencies.",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node server.js" }
+}
