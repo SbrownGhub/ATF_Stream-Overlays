@@ -1,0 +1,8 @@
+# live show data — names on the card, saved by the server
+data/
+# your PIN, if you set one
+pin.txt
+# fighter photos stay on this Mac, not in a public repo
+fighters/*
+!fighters/README.txt
+.DS_Store

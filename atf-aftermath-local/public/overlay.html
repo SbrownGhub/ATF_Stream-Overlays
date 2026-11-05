@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ATF Aftermath — Overlay</title>
+<!--
+  STREAMLABS BROWSER SOURCE: http://localhost:8787/overlay — 1920 x 1080.
+  Transparent. Driven live from the iPad controller.
+  Add ?checker to preview the transparency in a normal browser.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+<script src="/shared.js"></script>
+<style>
+:root{ --red:#D71920; --blue:#1E4FD8; --green:#12C46B; }
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;-webkit-font-smoothing:antialiased;}
+body.checker{background:repeating-conic-gradient(#15171a 0 25%,#1d2024 0 50%) 0 0/48px 48px;}
+#stage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:top left;overflow:hidden;}
+
+.row{position:absolute;left:0;width:1920px;height:210px;}
+.pod{position:absolute;top:0;width:360px;height:260px;transform:scale(.8);}
+.pod.l{left:var(--dx);transform-origin:top left;}
+.pod.r{right:var(--dx);transform-origin:top right;}
+.unit{position:absolute;inset:0;}
+.unit.back{z-index:1;} .unit.front{z-index:3;}
+.unit.off{display:none;}
+.anim{position:absolute;inset:0;will-change:transform,opacity;}
+
+/* ---------- fighter images ----------
+   Slots are shaped like a head-and-shoulders roster image. Each image is
+   trimmed by the server, then anchored to the two edges that matter:
+   the bottom (1px into the top of its banner) and the banner's inner end. */
+.shot{position:absolute;transform:scale(var(--fs,1));}
+/* grow from the corner that's pinned: base on the banner, side against its inner end */
+.pod.l .shot{transform-origin:right bottom;}
+.pod.r .shot{transform-origin:left bottom;}
+.shot img{width:100%;height:100%;display:block;object-fit:contain;object-position:right bottom;
+  filter:drop-shadow(0 14px 22px rgba(0,0,0,.6));}
+.shot img.none{visibility:hidden;}
+.pod.r .shot img{transform:scaleX(-1);}         /* mirrored, so object-position:right lands on the inner end */
+.unit.back  .shot{width:228px;height:142.5px;top:16.5px;}
+.unit.front .shot{width:256px;height:160px;top:49px;}
+.pod.l .unit.back  .shot{left:84px;}  .pod.l .unit.front .shot{left:160px;}
+.pod.r .unit.back  .shot{right:84px;} .pod.r .unit.front .shot{right:160px;}
+
+/* ---------- banners ---------- */
+.bar{position:absolute;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:2;background:var(--red);}
+.bar.blue{background:var(--blue);}
+.unit.back  .bar{top:158px;height:40px;}
+.unit.front .bar{top:208px;height:44px;}
+.pod.l .unit.back  .bar{left:calc(-150px - var(--ext));width:calc(462px + var(--ext));}
+.pod.l .unit.front .bar{left:calc(-174px - var(--ext));width:calc(590px + var(--ext));}
+.pod.r .unit.back  .bar{right:calc(-150px - var(--ext));width:calc(462px + var(--ext));}
+.pod.r .unit.front .bar{right:calc(-174px - var(--ext));width:calc(590px + var(--ext));}
+
+/* ---------- names: anchored to the banner's outer edge ---------- */
+.nm{position:absolute;z-index:4;display:flex;align-items:center;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;text-transform:uppercase;font-family:Anton,'Arial Black',Impact,sans-serif;
+  color:#fff;letter-spacing:.8px;text-shadow:0 2px 0 rgba(0,0,0,.28);}
+.unit.back  .nm{top:158px;height:40px;font-size:31px;}
+.unit.front .nm{top:208px;height:44px;font-size:33px;}
+.pod.l .nm{left:var(--edge);}
+.pod.r .nm{right:var(--edge);justify-content:flex-end;}
+
+/* ---------- winner ---------- */
+.win{position:absolute;width:32px;height:32px;border-radius:50%;background:var(--green);z-index:6;display:none;
+  border:2px solid rgba(255,255,255,.28);
+  box-shadow:0 0 20px rgba(18,196,107,1),0 0 34px rgba(18,196,107,.56),0 3px 10px rgba(0,0,0,.6);}
+.unit.won .win{display:block;}
+.win i{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:Anton,sans-serif;font-style:normal;font-size:17px;color:#fff;}
+.unit.won .shot img{filter:drop-shadow(0 0 2px var(--green)) drop-shadow(0 0 7.5px rgba(18,196,107,1))
+  drop-shadow(0 0 20px rgba(18,196,107,.69)) drop-shadow(0 14px 22px rgba(0,0,0,.6));}
+.unit.back  .win{top:162px;} .unit.front .win{top:214px;}
+.pod.l .unit.back  .win{left:282px;}  .pod.l .unit.front .win{left:386px;}
+.pod.r .unit.back  .win{right:282px;} .pod.r .unit.front .win{right:386px;}
+
+/* ---------- entrance ---------- */
+@keyframes inLeft {0%{opacity:0;transform:translateX(-110px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes inRight{0%{opacity:0;transform:translateX( 110px)}100%{opacity:1;transform:translateX(0)}}
+.pod.l .anim.run{animation:inLeft  .74s cubic-bezier(.16,.86,.3,1) both;}
+.pod.r .anim.run{animation:inRight .74s cubic-bezier(.16,.86,.3,1) both;}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;}}
+</style>
+</head>
+<body>
+<div id="stage"><div id="rows"></div></div>
+<script>
+/* =====================================================================
+   FIGHTER SIZE — the one number to change.
+     1    = as approved
+     1.1  = 10% bigger, 1.2 = 20% bigger, 0.9 = 10% smaller
+   Fighters grow upward and outward from where they stand, so the 1px
+   join to the banner and the alignment to its inner end never move.
+   Practical ceiling: about 1.2 before heads reach the banners of the
+   level above, about 1.25 before the top level clips at the top of the
+   frame. Save, then refresh the browser source in Streamlabs.
+   ===================================================================== */
+const FIGHTER_SCALE = 1.18;
+
+document.documentElement.style.setProperty('--fs', FIGHTER_SCALE);
+const ROWS = [ {y:20,dx:0}, {y:232,dx:6}, {y:444,dx:34}, {y:656,dx:96}, {y:868,dx:200} ];
+const units = {};
+
+/* ---------- build once ---------- */
+const rowsEl = document.getElementById('rows');
+ROWS.forEach((r, i) => {
+  const ext = Math.round(r.dx / 0.8) + 40, edge = Math.round(-r.dx / 0.8 + 18);
+  const row = document.createElement('div');
+  row.className = 'row'; row.style.top = r.y + 'px';
+  ['l','r'].forEach(side => {
+    const n = side === 'l' ? 2 * i + 1 : 2 * i + 2;
+    const pod = document.createElement('div');
+    pod.className = `pod ${side}`;
+    pod.style.cssText = `--dx:${r.dx}px;--ext:${ext}px;--edge:${edge}px`;
+    pod.dataset.edge = edge;
+    [['back', String(n)], ['front', n + '.1']].forEach(([layer, slot]) => {
+      const u = document.createElement('div');
+      u.className = `unit ${layer}`;
+      u.innerHTML = `<div class="anim">
+        <div class="shot"><img class="none" alt=""></div>
+        <div class="bar"></div>
+        <div class="nm"></div>
+        <div class="win"><i>W</i></div></div>`;
+      pod.appendChild(u);
+      units[slot] = { el:u, pod, layer, img:u.querySelector('img'), bar:u.querySelector('.bar'),
+                      nm:u.querySelector('.nm'), anim:u.querySelector('.anim'), ver:null, name:null, vis:null };
+      u.querySelector('img').addEventListener('load', () => fitPod(pod));
+      u.querySelector('img').addEventListener('error', e => e.target.classList.add('none'));
+    });
+    row.appendChild(pod);
+  });
+  rowsEl.appendChild(row);
+});
+
+/* ---------- names: fit to the room actually available ----------
+   A card fighter's name (upper banner) runs until the next-opponent image
+   starts, which depends on that image's shape once trimmed. The lower
+   banner's name runs to the winner marker. Too long: step the size down,
+   then trail off with an ellipsis. */
+function fitPod(pod){
+  const edge = parseFloat(pod.dataset.edge);
+  const [back, front] = [...pod.querySelectorAll('.unit')];
+  const fimg = front.querySelector('img');
+  let frontLeft = 416;                                    // no image: nothing covers the banner
+  if(!fimg.classList.contains('none') && fimg.naturalWidth){
+    const w = Math.min(256, 160 * fimg.naturalWidth / fimg.naturalHeight) * FIGHTER_SCALE;
+    frontLeft = 416 - w;                                  // bigger fighters leave the name less room
+  }
+  fit(back.querySelector('.nm'),  Math.min(frontLeft - 12, 272) - edge, 31);
+  fit(front.querySelector('.nm'), 376 - edge, 33);
+}
+function fit(el, max, base){
+  el.style.maxWidth = Math.max(60, max) + 'px';
+  let size = base; el.style.fontSize = size + 'px';
+  while(el.scrollWidth > el.clientWidth + 1 && size > 20){ size--; el.style.fontSize = size + 'px'; }
+}
+
+function play(slot){
+  const a = units[slot].anim;
+  a.classList.remove('run'); void a.offsetWidth; a.classList.add('run');
+}
+
+/* ---------- apply state ---------- */
+let first = true;
+function apply(s){
+  const refit = new Set();
+  ATF.SLOTS.forEach(slot => {
+    const u = units[slot], f = s.fighters[slot], ver = s.images[slot];
+    if(!u || !f) return;
+    u.el.classList.toggle('off', !f.visible);
+    u.el.classList.toggle('won', !!f.winner);
+    u.bar.classList.toggle('blue', f.color === 'blue');
+    if(u.name !== f.name){ u.nm.textContent = f.name; u.name = f.name; refit.add(u.pod); }
+    if(u.ver !== ver){
+      u.ver = ver;
+      if(ver){ u.img.classList.remove('none'); u.img.src = `/fighters/${slot}?v=${ver}`; }
+      else { u.img.classList.add('none'); u.img.removeAttribute('src'); refit.add(u.pod); }
+    }
+    /* slide in when a fighter is switched on — never on first paint, so a
+       Streamlabs refresh mid-show doesn't replay the whole card */
+    if(!first && f.visible && u.vis === false) play(slot);
+    u.vis = f.visible;
+  });
+  if(s.note && s.note.cmd === 'showAll' && !first)
+    ATF.SLOTS.forEach((slot, i) => setTimeout(() => play(slot), i * 55));
+  first = false;
+  const run = () => refit.forEach(fitPod);
+  document.fonts ? document.fonts.ready.then(run) : run();
+}
+
+ATF.connect(apply);
+
+/* ---------- fit 1920 x 1080 to the window ---------- */
+const stage = document.getElementById('stage');
+function fitStage(){
+  const k = Math.min(innerWidth / 1920, innerHeight / 1080);
+  stage.style.transform = `scale(${k})`;
+  stage.style.left = ((innerWidth - 1920 * k) / 2) + 'px';
+  stage.style.top  = ((innerHeight - 1080 * k) / 2) + 'px';
+}
+addEventListener('resize', fitStage); fitStage();
+if(new URLSearchParams(location.search).has('checker')) document.body.classList.add('checker');
+</script>
+</body>
+</html>
